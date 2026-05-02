@@ -1,0 +1,46 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# build outputs
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/.turbo/
+**/.vercel/
+
+# foundry
+contracts/cache/
+contracts/lib/
+contracts/broadcast/*/31337/
+contracts/broadcast/**/dry-run/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# env / secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# reference repo cloned for ENS pattern study — not part of our codebase
+veil-vpn/
+
+# claude / agent local state
+.claude/

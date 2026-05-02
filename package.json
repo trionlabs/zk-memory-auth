@@ -1,0 +1,10 @@
+{
+  "name": "zkcontextauth",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @zkca/admin-ui dev",
+    "build": "pnpm --filter @zkca/admin-ui build"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
