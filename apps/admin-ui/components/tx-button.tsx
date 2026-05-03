@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  useSimulateContract,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+} from "wagmi";
 import { sepoliaDeployment, ZkmaResolverAbi } from "@zkma/contracts-types";
 import type { Abi } from "viem";
 
@@ -29,8 +34,20 @@ export function TxButton({
   disabledReason,
   onConfirmed,
 }: TxButtonProps) {
+  const { address: connected } = useAccount();
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const { isLoading: isMining, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  // Pre-flight simulation surfaces the contract's named revert (UserMissing,
+  // NotUser, etc.) instead of MetaMask's misleading "gas limit too high".
+  const { error: simError } = useSimulateContract({
+    address: RESOLVER_ADDR,
+    abi: ZkmaResolverAbi as Abi,
+    functionName,
+    args,
+    account: connected,
+    query: { enabled: !!connected && !disabledReason },
+  });
 
   useEffect(() => {
     if (isSuccess) {
@@ -76,8 +93,10 @@ export function TxButton({
           {hash.slice(0, 12)}…
         </a>
       )}
-      {error && (
-        <p className="text-[10px] text-red-400 line-clamp-2">{error.message.split("\n")[0]}</p>
+      {(error || simError) && (
+        <pre className="text-[10px] text-red-400 font-mono whitespace-pre-wrap break-words max-h-64 overflow-auto">
+          {(error ?? simError)!.message}
+        </pre>
       )}
     </div>
   );
