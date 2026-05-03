@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { keccak256, toBytes } from "viem";
 import { TxButton } from "./tx-button";
 
 type Props = {
@@ -12,6 +13,7 @@ export function RegisterUserForm({ orgNode, onConfirmed }: Props) {
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [userAddr, setUserAddr] = useState("");
+  const [email, setEmail] = useState("");
   const [role, setRole] = useState("nurse");
   const [namespaces, setNamespaces] = useState("clinical,operational");
   const [maxTag, setMaxTag] = useState("confidential");
@@ -33,11 +35,23 @@ export function RegisterUserForm({ orgNode, onConfirmed }: Props) {
 
   const labelOk = /^[a-z0-9-]{1,32}$/.test(label);
   const addrOk = /^0x[0-9a-fA-F]{40}$/.test(userAddr);
+  // Loose RFC-822-ish; the gateway is the authoritative validator (it
+  // compares hashes, not strings). We just want to catch obvious typos here.
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const disableReason = !labelOk
     ? "label must be lowercase a-z, 0-9, hyphen"
     : !addrOk
       ? "userAddr must be a 0x-prefixed 20-byte address"
-      : null;
+      : !emailOk
+        ? "email must look like name@domain.tld"
+        : null;
+  // keccak256 over the lowercased email - matches what the gateway does on the
+  // proof's expected_email public input. Lowercasing is a deliberate choice:
+  // RFC 5321 makes local-parts case-sensitive but Google's IDP normalizes them,
+  // and we want the admin's typed email to match the JWT's email claim.
+  const emailHash = emailOk
+    ? (keccak256(toBytes(email.trim().toLowerCase())) as `0x${string}`)
+    : ("0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`);
 
   return (
     <div className="rounded-lg border border-zinc-700 bg-zinc-950 p-4 space-y-2">
@@ -51,6 +65,14 @@ export function RegisterUserForm({ orgNode, onConfirmed }: Props) {
 
         <label className="text-zinc-500 font-mono">userAddr</label>
         <input value={userAddr} onChange={(e) => setUserAddr(e.target.value)} placeholder="0x…" className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 font-mono" />
+
+        <label className="text-zinc-500 font-mono">email</label>
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="aysel@hospital.org"
+          className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 font-mono"
+        />
 
         <label className="text-zinc-500 font-mono">role</label>
         <input value={role} onChange={(e) => setRole(e.target.value)} className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 font-mono" />
@@ -72,7 +94,16 @@ export function RegisterUserForm({ orgNode, onConfirmed }: Props) {
       <div className="pt-2">
         <TxButton
           functionName="registerUser"
-          args={[orgNode, label, userAddr as `0x${string}`, role, namespaces, maxTag, BigInt(expirySecs)]}
+          args={[
+            orgNode,
+            label,
+            userAddr as `0x${string}`,
+            emailHash,
+            role,
+            namespaces,
+            maxTag,
+            BigInt(expirySecs),
+          ]}
           label="Register"
           className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400 px-4 py-1.5"
           disabledReason={disableReason}
@@ -81,6 +112,7 @@ export function RegisterUserForm({ orgNode, onConfirmed }: Props) {
             setOpen(false);
             setLabel("");
             setUserAddr("");
+            setEmail("");
           }}
         />
       </div>
