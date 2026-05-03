@@ -2,7 +2,7 @@
 
 import { useAccount, usePublicClient, useReadContract, useReadContracts } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
-import { sepoliaDeployment, ZkmaResolverAbi } from "@zkca/contracts-types";
+import { sepoliaDeployment, ZkmaResolverAbi } from "@zkma/contracts-types";
 import type { Abi } from "viem";
 import { labelHash, shortAddr } from "@/lib/utils";
 import { fetchOrgUserLabels, type OrgSummary } from "@/lib/users";

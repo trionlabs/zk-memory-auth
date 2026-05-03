@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { sepoliaDeployment, ZkmaResolverAbi } from "@zkca/contracts-types";
+import { sepoliaDeployment, ZkmaResolverAbi } from "@zkma/contracts-types";
 import type { Abi } from "viem";
 
 type Args = unknown[];

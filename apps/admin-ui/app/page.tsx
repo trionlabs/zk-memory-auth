@@ -1,4 +1,4 @@
-import { sepoliaDeployment } from "@zkca/contracts-types";
+import { sepoliaDeployment } from "@zkma/contracts-types";
 import { OrgList } from "@/components/org-list";
 import { WalletButton } from "@/components/wallet-button";
 

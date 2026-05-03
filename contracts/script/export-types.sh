@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Refreshes @zkca/contracts-types from the latest forge build + deployment artifact.
+# Refreshes @zkma/contracts-types from the latest forge build + deployment artifact.
 # Run after `forge build` and after every `forge script Bootstrap.s.sol --broadcast`.
 set -euo pipefail
 

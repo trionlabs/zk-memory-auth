@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAccount, useReadContract } from "wagmi";
-import { sepoliaDeployment, ZkmaResolverAbi } from "@zkca/contracts-types";
+import { sepoliaDeployment, ZkmaResolverAbi } from "@zkma/contracts-types";
 import type { Abi } from "viem";
 import { fmtExpiry, labelHash, shortAddr } from "@/lib/utils";
 import { TxButton } from "./tx-button";

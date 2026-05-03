@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { sepoliaDeployment, ZkmaResolverAbi } from "@zkca/contracts-types";
+import { sepoliaDeployment, ZkmaResolverAbi } from "@zkma/contracts-types";
 import { keccak256, namehash, stringToBytes, type Abi } from "viem";
 
 const RESOLVER = sepoliaDeployment.zkmaResolver;

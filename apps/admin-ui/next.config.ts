@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
     root: repoRoot,
   },
   // The contracts-types package ships TS source; transpile it for client bundles.
-  transpilePackages: ["@zkca/contracts-types"],
+  transpilePackages: ["@zkma/contracts-types"],
 };
 
 export default nextConfig;

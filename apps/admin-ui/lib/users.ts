@@ -1,5 +1,5 @@
 import { parseAbiItem, type PublicClient } from "viem";
-import { sepoliaDeployment } from "@zkca/contracts-types";
+import { sepoliaDeployment } from "@zkma/contracts-types";
 
 const RESOLVER = sepoliaDeployment.zkmaResolver;
 const FROM_BLOCK = BigInt(sepoliaDeployment.deployBlock);
