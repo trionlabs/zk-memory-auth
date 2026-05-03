@@ -91,9 +91,12 @@ HwIDAQAB
 const MAX_PARTIAL_DATA_LENGTH = 1024;
 const MAX_EMAIL_LENGTH = 100;
 const MAX_AUD_LENGTH = 128;
+const MAX_ISS_LENGTH = 64;
 const EMAIL = "alice@test.com";
-const AUD = "test-aud";
-const IAT = 1737642217;
+const AUD = "zkma-test-client.apps.googleusercontent.com";
+const ISS = "https://accounts.google.com";
+// Use the current time so iat passes the gateway's freshness window.
+const IAT = Math.floor(Date.now() / 1000) - 60;
 
 function base64UrlToHex(s: string): string {
   const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
@@ -116,17 +119,19 @@ async function main(): Promise<void> {
   const testJwk = publicKey.export({ format: "jwk" }) as JsonWebKey;
   process.env.ZKMA_SKIP_JWKS = "1";
   process.env.ZKMA_EXTRA_MODULI = base64UrlToHex(testJwk.n!);
+  process.env.ZKMA_EXPECTED_AUD = AUD;
+  process.env.ZKMA_EXPECTED_ISS = ISS;
   resetJwksCache();
 
   const jwt = jsonwebtoken.sign(
     {
-      iss: "https://accounts.google.com",
+      iss: ISS,
       sub: "test-subject",
       email_verified: true,
       email: EMAIL,
       iat: IAT,
       aud: AUD,
-      exp: 1799999999,
+      exp: IAT + 7 * 24 * 3600,
     },
     privateKey,
     { algorithm: "RS256" },
@@ -140,13 +145,16 @@ async function main(): Promise<void> {
     maxSignedDataLength: MAX_PARTIAL_DATA_LENGTH,
   });
 
-  // Pad expected_email and expected_aud to their MAX lengths.
+  // Pad expected_email, expected_aud, expected_iss to their MAX lengths.
   const emailBytes = new TextEncoder().encode(EMAIL);
   const emailStorage = new Array<number>(MAX_EMAIL_LENGTH).fill(0);
   for (let i = 0; i < emailBytes.length; i++) emailStorage[i] = emailBytes[i]!;
   const audBytes = new TextEncoder().encode(AUD);
   const audStorage = new Array<number>(MAX_AUD_LENGTH).fill(0);
   for (let i = 0; i < audBytes.length; i++) audStorage[i] = audBytes[i]!;
+  const issBytes = new TextEncoder().encode(ISS);
+  const issStorage = new Array<number>(MAX_ISS_LENGTH).fill(0);
+  for (let i = 0; i < issBytes.length; i++) issStorage[i] = issBytes[i]!;
 
   const inputs = {
     data: jwtInputs.data!,
@@ -156,8 +164,9 @@ async function main(): Promise<void> {
     redc_params_limbs: jwtInputs.redc_params_limbs!,
     expected_email: { storage: emailStorage, len: emailBytes.length },
     expected_aud: { storage: audStorage, len: audBytes.length },
+    expected_iss: { storage: issStorage, len: issBytes.length },
     iat_lower: IAT.toString(),
-    iat_upper: IAT.toString(),
+    iat_upper: (IAT + 60).toString(),
   };
 
   console.log("[3/5] load circuit + execute witness");
@@ -244,7 +253,6 @@ async function main(): Promise<void> {
   console.log(`      wrong-commitment rejection: ${wrongResult.reason}`);
 
   // Negative case 3: JWKS pin rejects a proof whose modulus is not allowlisted.
-  // We swap to an empty allowlist (skip JWKS, no extra moduli) and re-verify.
   process.env.ZKMA_SKIP_JWKS = "1";
   process.env.ZKMA_EXTRA_MODULI = "";
   resetJwksCache();
@@ -257,9 +265,55 @@ async function main(): Promise<void> {
     console.error("FAIL: gateway accepted a proof not in the JWKS allowlist");
     process.exit(1);
   }
-  console.log(`      jwks-pin rejection: ${noJwksResult.reason}`);
+  console.log(`      jwks-pin rejection:  ${noJwksResult.reason}`);
 
-  console.log("\nPASS - gateway verifies real proofs and rejects bad ones.");
+  // Restore the test pubkey allowlist so the next negative cases isolate one
+  // gate at a time.
+  process.env.ZKMA_EXTRA_MODULI = base64UrlToHex(testJwk.n!);
+  resetJwksCache();
+
+  // Negative case 4: aud mismatch - gateway expects a different OAuth client.
+  process.env.ZKMA_EXPECTED_AUD = "totally-different-app.apps.googleusercontent.com";
+  const audMismatch = await verifyProof({
+    proof: proofHex,
+    publicInputs: publicInputsHex,
+    expectedCommitment,
+  });
+  if (audMismatch.ok) {
+    console.error("FAIL: gateway accepted a proof with mismatched aud");
+    process.exit(1);
+  }
+  console.log(`      aud-mismatch rejection: ${audMismatch.reason}`);
+  process.env.ZKMA_EXPECTED_AUD = AUD;
+
+  // Negative case 5: iss mismatch - JWT was issued by some other IDP.
+  process.env.ZKMA_EXPECTED_ISS = "https://login.microsoftonline.com";
+  const issMismatch = await verifyProof({
+    proof: proofHex,
+    publicInputs: publicInputsHex,
+    expectedCommitment,
+  });
+  if (issMismatch.ok) {
+    console.error("FAIL: gateway accepted a proof with mismatched iss");
+    process.exit(1);
+  }
+  console.log(`      iss-mismatch rejection: ${issMismatch.reason}`);
+  process.env.ZKMA_EXPECTED_ISS = ISS;
+
+  // Negative case 6: iat outside the gateway's freshness window.
+  process.env.ZKMA_IAT_MAX_AGE_SECS = "1"; // anything older than 1s is stale
+  const iatStale = await verifyProof({
+    proof: proofHex,
+    publicInputs: publicInputsHex,
+    expectedCommitment,
+  });
+  if (iatStale.ok) {
+    console.error("FAIL: gateway accepted a stale-iat proof");
+    process.exit(1);
+  }
+  console.log(`      iat-stale rejection:    ${iatStale.reason}`);
+
+  console.log("\nPASS - gateway verifies real proofs and rejects every replay vector.");
 }
 
 void main().catch((e) => {

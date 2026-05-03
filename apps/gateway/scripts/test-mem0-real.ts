@@ -150,8 +150,12 @@ async function searchAs(
     publicInputs: "0x00" as `0x${string}`,
   };
   const requestHash = keccak256(new TextEncoder().encode(JSON.stringify(body)));
+  const domainHash = keccak256(
+    new TextEncoder().encode(process.env.ZKMA_GATEWAY_DOMAIN ?? "zkma:gateway:dev"),
+  );
   const challengeBytes = keccak256(
     new Uint8Array([
+      ...Buffer.from(domainHash.replace(/^0x/, ""), "hex"),
       ...Buffer.from(nonce.replace(/^0x/, ""), "hex"),
       ...Buffer.from(requestHash.replace(/^0x/, ""), "hex"),
     ]),

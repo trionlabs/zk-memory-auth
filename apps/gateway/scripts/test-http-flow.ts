@@ -82,9 +82,12 @@ HwIDAQAB
 const MAX_PARTIAL_DATA_LENGTH = 1024;
 const MAX_EMAIL_LENGTH = 100;
 const MAX_AUD_LENGTH = 128;
+const MAX_ISS_LENGTH = 64;
 const EMAIL = "alice@test.com";
-const AUD = "test-aud";
-const IAT = 1737642217;
+const AUD = "zkma-test-client.apps.googleusercontent.com";
+const ISS = "https://accounts.google.com";
+const IAT = Math.floor(Date.now() / 1000) - 60;
+const GATEWAY_DOMAIN = "zkma:gateway:dev"; // matches default ZKMA_GATEWAY_DOMAIN
 
 // A throwaway hardhat-style key. Public Sepolia/etc safe - never used elsewhere.
 const TEST_WALLET_PK = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" as const;
@@ -112,19 +115,23 @@ async function main(): Promise<void> {
   const privateKey = crypto.createPrivateKey({ key: PRIVATE_KEY_PEM, type: "pkcs8", format: "pem" });
   const publicKey = crypto.createPublicKey({ key: PUBLIC_KEY_PEM, type: "spki", format: "pem" });
 
-  // Allow the test pubkey through the gateway's JWKS pin.
+  // Allow the test pubkey through the gateway's JWKS pin and pin every
+  // user-supplied public input to the test values.
   const testJwk = publicKey.export({ format: "jwk" }) as JsonWebKey;
   process.env.ZKMA_SKIP_JWKS = "1";
   process.env.ZKMA_EXTRA_MODULI = base64UrlToHex(testJwk.n!);
+  process.env.ZKMA_EXPECTED_AUD = AUD;
+  process.env.ZKMA_EXPECTED_ISS = ISS;
+  process.env.ZKMA_GATEWAY_DOMAIN = GATEWAY_DOMAIN;
   const jwt = jsonwebtoken.sign(
     {
-      iss: "https://accounts.google.com",
+      iss: ISS,
       sub: "test",
       email_verified: true,
       email: EMAIL,
       iat: IAT,
       aud: AUD,
-      exp: 1799999999,
+      exp: IAT + 7 * 24 * 3600,
     },
     privateKey,
     { algorithm: "RS256" },
@@ -138,6 +145,9 @@ async function main(): Promise<void> {
   const audBytes = new TextEncoder().encode(AUD);
   const audStorage = new Array<number>(MAX_AUD_LENGTH).fill(0);
   for (let i = 0; i < audBytes.length; i++) audStorage[i] = audBytes[i]!;
+  const issBytes = new TextEncoder().encode(ISS);
+  const issStorage = new Array<number>(MAX_ISS_LENGTH).fill(0);
+  for (let i = 0; i < issBytes.length; i++) issStorage[i] = issBytes[i]!;
 
   const circuit = JSON.parse(readFileSync(CIRCUIT_PATH, "utf8"));
   const noir = new Noir(circuit);
@@ -149,8 +159,9 @@ async function main(): Promise<void> {
     redc_params_limbs: jwtInputs.redc_params_limbs,
     expected_email: { storage: emailStorage, len: emailBytes.length },
     expected_aud: { storage: audStorage, len: audBytes.length },
+    expected_iss: { storage: issStorage, len: issBytes.length },
     iat_lower: IAT.toString(),
-    iat_upper: IAT.toString(),
+    iat_upper: (IAT + 60).toString(),
   } as never);
 
   const backend = new UltraHonkBackend(circuit.bytecode);
@@ -215,8 +226,10 @@ async function main(): Promise<void> {
 
     const body = { query: "patient 304 meds", subname, proof: proofHex, publicInputs: publicInputsHex };
     const requestHash = keccak256(new TextEncoder().encode(JSON.stringify(body)));
+    const domainHash = keccak256(new TextEncoder().encode(GATEWAY_DOMAIN));
     const challenge = keccak256(
       new Uint8Array([
+        ...Buffer.from(domainHash.replace(/^0x/, ""), "hex"),
         ...Buffer.from(nonce.replace(/^0x/, ""), "hex"),
         ...Buffer.from(requestHash.replace(/^0x/, ""), "hex"),
       ]),
