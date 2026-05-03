@@ -17,6 +17,11 @@ contracts/lib/
 contracts/broadcast/*/31337/
 contracts/broadcast/**/dry-run/
 
+# nargo (noir circuits)
+circuits/**/target/
+circuits/**/Prover.toml
+circuits/**/Verifier.toml
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
