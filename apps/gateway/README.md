@@ -76,8 +76,24 @@ The sig is recovered against the address returned by the subname's `addr` resolv
 
 Write rules (`src/mem0.ts::checkWrite`): tag must be at-or-below the principal's `max-tag`; namespace must be in the principal's namespaces; `owner_org` is forced to the principal's org (no impersonation); `shared_with` is whatever the writer chooses.
 
+## End-to-end real-proof test
+
+```bash
+cd apps/gateway && pnpm test:proof
+```
+
+Signs a JWT with the noir-jwt test key, generates a real UltraHonk proof for the zkma-auth circuit, runs it through `verifyProof`, and exits non-zero if anything is wrong. Also verifies that tampered proofs and wrong commitments are rejected. ~10-15 seconds end-to-end (most of it is proof generation).
+
+## Toolchain pins
+
+- `nargo 1.0.0-beta.15` (matches `circuits/.tool-versions`)
+- `@aztec/bb.js@3.0.0-nightly.20251104` (the bb version `bbup` resolves for this nargo)
+- `@noir-lang/noir_js@1.0.0-beta.15`
+
+bb.js, noir_js, and the bb native binary all need to match the nargo version that compiled the circuit. Pinning them by exact version is the only way to keep the witness/proof formats compatible. When bumping nargo, run `bbup` and bump these three together.
+
 ## Known gaps
 
-- **No Noir verifier.** `src/proof.ts` confirms the commitment hashes match but does not run the bb.js verifier. Wire that in once the circuit's verification key is exported from nargo.
 - **Nonce store is in-process.** Single-instance only. Multi-instance deployments need shared state (Redis or similar).
 - **mem0's metadata filter API is bypassed.** We forward the query unfiltered and filter in TS post-hoc. Slower but correct across mem0 versions.
+- **CRS download blocks first verify.** bb.js fetches the trusted-setup CRS lazily on first call. ~5-10 seconds. Acceptable for hackathon, fix for prod by bundling the CRS.
