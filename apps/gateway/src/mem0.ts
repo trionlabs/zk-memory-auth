@@ -40,13 +40,17 @@ export async function searchAndFilter(
   principal: Principal,
   query: string,
 ): Promise<Mem0SearchHit[]> {
-  const res = await fetch(`${env.mem0BaseUrl}/v1/memories/search`, {
+  const res = await fetch(`${env.mem0BaseUrl}/search`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       ...(env.mem0ApiKey ? { authorization: `Token ${env.mem0ApiKey}` } : {}),
     },
-    body: JSON.stringify({ query }),
+    // mem0 requires filters with at least one of {user_id, agent_id, run_id}.
+    // We use agent_id as the app-level scope (every zkma write tags it) so the
+    // gateway can fetch across users; metadata-based policy filtering is what
+    // actually decides what this principal sees, including cross-org sharing.
+    body: JSON.stringify({ query, filters: { agent_id: env.mem0AgentId } }),
   });
 
   if (!res.ok) {
@@ -106,7 +110,7 @@ export async function postMemory(
   content: string,
   userId: string,
 ): Promise<unknown> {
-  const res = await fetch(`${env.mem0BaseUrl}/v1/memories`, {
+  const res = await fetch(`${env.mem0BaseUrl}/memories`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -115,12 +119,17 @@ export async function postMemory(
     body: JSON.stringify({
       messages: [{ role: "user", content }],
       user_id: userId,
+      agent_id: env.mem0AgentId,
       metadata: {
         namespace: meta.namespace,
         tag: meta.tag,
         owner_org: meta.ownerOrgLabel,
         shared_with: [...meta.sharedWith],
       },
+      // We always store the verbatim content (no LLM extraction) because the
+      // metadata is what gates access, and LLM extraction can drop or rephrase
+      // facts that the org admin cared about.
+      infer: false,
     }),
   });
 

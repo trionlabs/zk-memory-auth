@@ -198,18 +198,20 @@ const seeds: Seed[] = [
 ];
 
 async function postOne(seed: Seed): Promise<void> {
-  const res = await fetch(`${MEM0}/v1/memories`, {
+  const res = await fetch(`${MEM0}/memories`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       messages: [{ role: "user", content: seed.content }],
       user_id: seed.user,
+      agent_id: "zkma",
       metadata: {
         namespace: seed.namespace,
         tag: seed.tag,
         owner_org: seed.ownerOrg,
         shared_with: seed.sharedWith,
       },
+      infer: false,
     }),
   });
   if (!res.ok) {

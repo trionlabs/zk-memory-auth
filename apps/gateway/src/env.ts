@@ -11,6 +11,8 @@ export const env = {
     process.env.SEPOLIA_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com",
   mem0BaseUrl: process.env.MEM0_BASE_URL ?? "http://localhost:8888",
   mem0ApiKey: process.env.MEM0_API_KEY ?? "",
+  /** mem0 agent_id used to scope every zkma write+search at the mem0 level. */
+  mem0AgentId: process.env.MEM0_AGENT_ID ?? "zkma",
   /** When true, accept the proof header as-is without verifying. Demo only. */
   skipProofVerify: process.env.ZKMA_SKIP_PROOF_VERIFY === "1",
   /** Path to the nargo-compiled circuit json (target/zkma_auth.json). */
