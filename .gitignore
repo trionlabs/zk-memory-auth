@@ -22,6 +22,9 @@ circuits/**/target/
 circuits/**/Prover.toml
 circuits/**/Verifier.toml
 
+# bundled circuit artifact for admin UI (regenerated from circuits/ on every build)
+apps/admin-ui/public/circuit/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
