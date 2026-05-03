@@ -11,6 +11,7 @@
     "test:proof": "tsx scripts/test-real-proof.ts",
     "test:http": "tsx scripts/test-http-flow.ts",
     "test:mem0": "tsx scripts/test-mem0-real.ts",
+    "test:claims": "tsx scripts/test-claims-unit.ts",
     "stub:openai": "tsx scripts/stub-openai.ts"
   },
   "dependencies": {
