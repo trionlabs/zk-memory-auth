@@ -2,8 +2,10 @@ import { env } from "./env.js";
 import {
   evaluate,
   isTag,
+  tagAtMost,
   type MemoryMeta,
   type Principal,
+  type Tag,
 } from "@zkma/policy";
 
 type Mem0SearchHit = {
@@ -15,6 +17,18 @@ type Mem0SearchHit = {
 type Mem0SearchResponse = {
   results?: Mem0SearchHit[];
 };
+
+export type WriteRequest = {
+  content: string;
+  namespace: string;
+  tag: Tag;
+  /** Optional cross-org sharing list. */
+  sharedWith?: readonly string[];
+};
+
+export type WriteCheck =
+  | { allow: true; meta: MemoryMeta }
+  | { allow: false; reason: string };
 
 /**
  * Forwards a search to the upstream mem0 server, then drops every hit whose
@@ -46,6 +60,74 @@ export async function searchAndFilter(
     if (!meta) return false; // fail-closed: untagged memory is invisible
     return evaluate(principal, meta).allow;
   });
+}
+
+/**
+ * Decide whether `principal` is allowed to write `req` and, if so, return the
+ * canonical MemoryMeta to attach. Write rules:
+ *   - tag must be at-or-below principal.maxTag
+ *   - namespace must be in principal.namespaces
+ *   - ownerOrgLabel is forced to principal.orgLabel (no impersonation)
+ *   - sharedWith may contain any orgs the principal chooses to share with
+ *
+ * Returns a denial reason if any rule fails. Pure - no side effects.
+ */
+export function checkWrite(principal: Principal, req: WriteRequest): WriteCheck {
+  if (!isTag(req.tag)) return { allow: false, reason: `unknown tag ${req.tag}` };
+  if (!tagAtMost(req.tag, principal.maxTag)) {
+    return {
+      allow: false,
+      reason: `cannot write tag ${req.tag} above max-tag ${principal.maxTag}`,
+    };
+  }
+  if (!principal.namespaces.includes(req.namespace)) {
+    return {
+      allow: false,
+      reason: `cannot write namespace ${req.namespace} (not in ${principal.namespaces.join(",")})`,
+    };
+  }
+  return {
+    allow: true,
+    meta: {
+      namespace: req.namespace,
+      tag: req.tag,
+      ownerOrgLabel: principal.orgLabel,
+      sharedWith: req.sharedWith ?? [],
+    },
+  };
+}
+
+/**
+ * Forwards a write to mem0 with the metadata locked to what `checkWrite` produced.
+ * Returns the upstream JSON unchanged so clients see the real mem0 id.
+ */
+export async function postMemory(
+  meta: MemoryMeta,
+  content: string,
+  userId: string,
+): Promise<unknown> {
+  const res = await fetch(`${env.mem0BaseUrl}/v1/memories`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(env.mem0ApiKey ? { authorization: `Token ${env.mem0ApiKey}` } : {}),
+    },
+    body: JSON.stringify({
+      messages: [{ role: "user", content }],
+      user_id: userId,
+      metadata: {
+        namespace: meta.namespace,
+        tag: meta.tag,
+        owner_org: meta.ownerOrgLabel,
+        shared_with: [...meta.sharedWith],
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`mem0 write failed: ${res.status} ${await res.text()}`);
+  }
+  return res.json();
 }
 
 function parseMemoryMeta(raw: Record<string, unknown> | null | undefined): MemoryMeta | null {

@@ -26,7 +26,8 @@ PORT=8787 \
 |---|---|---|
 | `GET` | `/healthz` | liveness |
 | `GET` | `/challenge?subname=aysel.zkmemory-istanbulhospital.eth` | issue a single-use nonce (60s TTL) |
-| `POST` | `/v1/memories/search` | mem0-compatible search; gated by ENS + proof + sig |
+| `POST` | `/v1/memories/search` | mem0-compatible search; results filtered through `@zkma/policy` |
+| `POST` | `/v1/memories` | mem0-compatible write; metadata locked to principal's caps |
 
 ### Search request shape
 
@@ -54,9 +55,29 @@ The sig is recovered against the address returned by the subname's `addr` resolv
 - `src/mem0.ts` - HTTP forward to mem0 + post-hoc policy filter on results
 - `src/index.ts` - Fastify server: nonce store, sig verify, orchestration
 
+### Write request shape
+
+```jsonc
+// headers same as search
+"x-zkma-nonce": "0x...",
+"x-zkma-sig":   "0x...",
+
+// body
+{
+  "subname": "aysel.zkmemory-istanbulhospital.eth",
+  "proof": "0x...",
+  "publicInputs": "0x...",
+  "content": "patient 304 prescribed amoxicillin 500mg tid",
+  "namespace": "clinical",
+  "tag": "confidential",
+  "sharedWith": []
+}
+```
+
+Write rules (`src/mem0.ts::checkWrite`): tag must be at-or-below the principal's `max-tag`; namespace must be in the principal's namespaces; `owner_org` is forced to the principal's org (no impersonation); `shared_with` is whatever the writer chooses.
+
 ## Known gaps
 
 - **No Noir verifier.** `src/proof.ts` confirms the commitment hashes match but does not run the bb.js verifier. Wire that in once the circuit's verification key is exported from nargo.
-- **No write path.** Only `/v1/memories/search` is implemented. Writes need their own policy: a principal can only write at or below their `max-tag` and within their namespaces.
 - **Nonce store is in-process.** Single-instance only. Multi-instance deployments need shared state (Redis or similar).
 - **mem0's metadata filter API is bypassed.** We forward the query unfiltered and filter in TS post-hoc. Slower but correct across mem0 versions.
