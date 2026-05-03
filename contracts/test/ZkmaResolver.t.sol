@@ -15,9 +15,9 @@ import {IExtendedResolver} from "../src/contracts/resolvers/profiles/IExtendedRe
 import {ITextResolver} from "../src/contracts/resolvers/profiles/ITextResolver.sol";
 import {IAddrResolver} from "../src/contracts/resolvers/profiles/IAddrResolver.sol";
 
-import {ZkcaResolver} from "../src/zkca/ZkcaResolver.sol";
+import {ZkmaResolver} from "../src/zkma/ZkmaResolver.sol";
 
-contract ZkcaResolverTest is Test {
+contract ZkmaResolverTest is Test {
     function onERC1155Received(address, address, uint256, uint256, bytes calldata)
         external pure returns (bytes4) { return this.onERC1155Received.selector; }
     function onERC1155BatchReceived(address, address, uint256[] calldata, uint256[] calldata, bytes calldata)
@@ -30,7 +30,7 @@ contract ZkcaResolverTest is Test {
     ENSRegistry ens;
     BaseRegistrarImplementation baseRegistrar;
     NameWrapper nameWrapper;
-    ZkcaResolver resolver;
+    ZkmaResolver resolver;
 
     address platform = address(this);
     address adminA   = address(0xAAAA); // hospital admin
@@ -38,8 +38,8 @@ contract ZkcaResolverTest is Test {
     address aysel    = address(0xA15E1);
     address bob      = address(0xB0B);
 
-    string  hospitalLabel  = "zkcontext-istanbulhospital";
-    string  insuranceLabel = "zkcontext-acmeinsurance";
+    string  hospitalLabel  = "zkmemory-istanbulhospital";
+    string  insuranceLabel = "zkmemory-acmeinsurance";
     bytes32 hospitalNode;
     bytes32 insuranceNode;
 
@@ -61,7 +61,7 @@ contract ZkcaResolverTest is Test {
         baseRegistrar.addController(address(nameWrapper));
         baseRegistrar.addController(platform);
 
-        resolver = new ZkcaResolver(INameWrapper(address(nameWrapper)));
+        resolver = new ZkmaResolver(INameWrapper(address(nameWrapper)));
 
         // Each org admin separately registers + wraps their own .eth name.
         hospitalNode  = _registerWrapped(hospitalLabel,  adminA);
@@ -117,7 +117,7 @@ contract ZkcaResolverTest is Test {
         nameWrapper.setApprovalForAll(address(resolver), true);
 
         vm.prank(adminA);
-        vm.expectRevert(ZkcaResolver.LabelMissingPrefix.selector);
+        vm.expectRevert(ZkmaResolver.LabelMissingPrefix.selector);
         resolver.registerOrg("istanbulhospital");
     }
 
@@ -126,14 +126,14 @@ contract ZkcaResolverTest is Test {
         nameWrapper.setApprovalForAll(address(resolver), true);
 
         vm.prank(bob);
-        vm.expectRevert(ZkcaResolver.NotOrgAdmin.selector);
+        vm.expectRevert(ZkmaResolver.NotOrgAdmin.selector);
         resolver.registerOrg(hospitalLabel);
     }
 
     function test_registerOrg_revertsIfNotApproved() public {
         // Don't approve.
         vm.prank(adminA);
-        vm.expectRevert(ZkcaResolver.WrapperNotApproved.selector);
+        vm.expectRevert(ZkmaResolver.WrapperNotApproved.selector);
         resolver.registerOrg(hospitalLabel);
     }
 
@@ -144,7 +144,7 @@ contract ZkcaResolverTest is Test {
         resolver.registerOrg(hospitalLabel);
 
         vm.prank(adminA);
-        vm.expectRevert(ZkcaResolver.OrgAlreadyRegistered.selector);
+        vm.expectRevert(ZkmaResolver.OrgAlreadyRegistered.selector);
         resolver.registerOrg(hospitalLabel);
     }
 
@@ -170,9 +170,9 @@ contract ZkcaResolverTest is Test {
         assertEq(nameWrapper.ownerOf(uint256(userNode)), aysel);
 
         // Resolver records text data.
-        assertEq(resolver.text(userNode, "zkca:role"), "nurse");
-        assertEq(resolver.text(userNode, "zkca:namespaces"), "clinical,operational");
-        assertEq(resolver.text(userNode, "zkca:max-tag"), "confidential");
+        assertEq(resolver.text(userNode, "zkma:role"), "nurse");
+        assertEq(resolver.text(userNode, "zkma:namespaces"), "clinical,operational");
+        assertEq(resolver.text(userNode, "zkma:max-tag"), "confidential");
 
         // addr returns the user's wallet (signature verification path).
         assertEq(resolver.addr(userNode), payable(aysel));
@@ -181,7 +181,7 @@ contract ZkcaResolverTest is Test {
     function test_registerUser_revertsIfNotAdmin() public {
         _registerHospital();
         vm.prank(bob);
-        vm.expectRevert(ZkcaResolver.NotOrgAdmin.selector);
+        vm.expectRevert(ZkmaResolver.NotOrgAdmin.selector);
         resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", 0);
     }
 
@@ -190,14 +190,14 @@ contract ZkcaResolverTest is Test {
         vm.prank(adminA);
         resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
         vm.prank(adminA);
-        vm.expectRevert(ZkcaResolver.UserAlreadyExists.selector);
+        vm.expectRevert(ZkmaResolver.UserAlreadyExists.selector);
         resolver.registerUser(hospitalNode, "aysel", bob, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
     }
 
     function test_registerUser_revertsIfOrgNotRegistered() public {
         // hospital is NOT registered yet.
         vm.prank(adminA);
-        vm.expectRevert(ZkcaResolver.OrgNotRegistered.selector);
+        vm.expectRevert(ZkmaResolver.OrgNotRegistered.selector);
         resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
     }
 
@@ -209,7 +209,7 @@ contract ZkcaResolverTest is Test {
         resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
 
         vm.prank(adminA);
-        vm.expectRevert(ZkcaResolver.NotUser.selector);
+        vm.expectRevert(ZkmaResolver.NotUser.selector);
         resolver.setProofCommitment(hospitalNode, "aysel", bytes32(uint256(0xdeadbeef)));
     }
 
@@ -223,7 +223,7 @@ contract ZkcaResolverTest is Test {
         resolver.setProofCommitment(hospitalNode, "aysel", c);
 
         bytes32 userNode = keccak256(abi.encodePacked(hospitalNode, keccak256("aysel")));
-        assertEq(resolver.text(userNode, "zkca:proof-commitment"), _hex(c));
+        assertEq(resolver.text(userNode, "zkma:proof-commitment"), _hex(c));
     }
 
     function test_userAddr_isImmutableAfterRegistration() public {
@@ -232,7 +232,7 @@ contract ZkcaResolverTest is Test {
         resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
 
         vm.prank(adminA);
-        vm.expectRevert(ZkcaResolver.UserAlreadyExists.selector);
+        vm.expectRevert(ZkmaResolver.UserAlreadyExists.selector);
         resolver.registerUser(hospitalNode, "aysel", bob, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
 
         bytes32 userNode = keccak256(abi.encodePacked(hospitalNode, keccak256("aysel")));
@@ -244,11 +244,11 @@ contract ZkcaResolverTest is Test {
     function test_orgText_partners_andOrgLabel() public {
         _registerHospital();
         vm.prank(adminA);
-        resolver.setPartners(hospitalNode, "zkcontext-acmeinsurance.eth");
+        resolver.setPartners(hospitalNode, "zkmemory-acmeinsurance.eth");
 
-        assertEq(resolver.text(hospitalNode, "zkca:partners"), "zkcontext-acmeinsurance.eth");
-        assertEq(resolver.text(hospitalNode, "zkca:platform"), "zkcontextauth");
-        assertEq(resolver.text(hospitalNode, "zkca:org"), hospitalLabel);
+        assertEq(resolver.text(hospitalNode, "zkma:partners"), "zkmemory-acmeinsurance.eth");
+        assertEq(resolver.text(hospitalNode, "zkma:platform"), "zkmemoryauthorization");
+        assertEq(resolver.text(hospitalNode, "zkma:org"), hospitalLabel);
     }
 
     function test_orgAddr_returnsAdmin() public {
@@ -274,7 +274,7 @@ contract ZkcaResolverTest is Test {
 
         bytes memory dnsName = _dns3("aysel", hospitalLabel, "eth");
         bytes32 userNode = keccak256(abi.encodePacked(hospitalNode, keccak256("aysel")));
-        bytes memory call = abi.encodeWithSelector(ITextResolver.text.selector, userNode, "zkca:role");
+        bytes memory call = abi.encodeWithSelector(ITextResolver.text.selector, userNode, "zkma:role");
         string memory v = abi.decode(resolver.resolve(dnsName, call), (string));
         assertEq(v, "nurse");
     }
@@ -294,18 +294,18 @@ contract ZkcaResolverTest is Test {
     function test_resolve_orgText_partners_viaWildcard() public {
         _registerHospital();
         vm.prank(adminA);
-        resolver.setPartners(hospitalNode, "zkcontext-acmeinsurance.eth");
+        resolver.setPartners(hospitalNode, "zkmemory-acmeinsurance.eth");
 
         bytes memory dnsName = _dns2(hospitalLabel, "eth");
-        bytes memory call = abi.encodeWithSelector(ITextResolver.text.selector, hospitalNode, "zkca:partners");
+        bytes memory call = abi.encodeWithSelector(ITextResolver.text.selector, hospitalNode, "zkma:partners");
         string memory v = abi.decode(resolver.resolve(dnsName, call), (string));
-        assertEq(v, "zkcontext-acmeinsurance.eth");
+        assertEq(v, "zkmemory-acmeinsurance.eth");
     }
 
     function test_resolve_revertsForUnsupportedSelector() public {
         bytes memory dnsName = _dns2(hospitalLabel, "eth");
         bytes memory call = abi.encodeWithSelector(bytes4(0xdeadbeef), bytes32(0));
-        vm.expectRevert(ZkcaResolver.UnsupportedSelector.selector);
+        vm.expectRevert(ZkmaResolver.UnsupportedSelector.selector);
         resolver.resolve(dnsName, call);
     }
 

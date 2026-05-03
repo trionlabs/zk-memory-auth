@@ -7,11 +7,11 @@ import {ITextResolver} from "@ensdomains/resolvers/profiles/ITextResolver.sol";
 import {IAddrResolver} from "@ensdomains/resolvers/profiles/IAddrResolver.sol";
 import {INameWrapper} from "@ensdomains/wrapper/INameWrapper.sol";
 
-/// @title  ZkcaResolver (v2 — sovereign org names + minted user subnames)
+/// @title  ZkmaResolver (v2 - sovereign org names + minted user subnames)
 ///
-/// @notice Each organization owns its own `zkcontext-<orgname>.eth` on Sepolia/Mainnet.
-///         The `zkcontext-` prefix is enforced at registration so anyone scanning ENS
-///         can identify orgs that opted into the zkcontextauth platform — it's not a
+/// @notice Each organization owns its own `zkmemory-<orgname>.eth` on Sepolia/Mainnet.
+///         The `zkmemory-` prefix is enforced at registration so anyone scanning ENS
+///         can identify orgs that opted into the zkmemoryauthorization platform - it's not a
 ///         security claim, just a discoverability marker.
 ///
 ///         `registerOrg(label)`:
@@ -31,15 +31,15 @@ import {INameWrapper} from "@ensdomains/wrapper/INameWrapper.sol";
 ///           - userAddr is write-once at registration; admin cannot rotate it. The
 ///             per-request signature path in PRD §15.3 stays sound: even if admin is
 ///             compromised, they cannot impersonate a user without the user's wallet.
-contract ZkcaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC165 {
+contract ZkmaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC165 {
     INameWrapper public immutable nameWrapper;
 
     bytes32 public constant ETH_NODE =
         0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae;
-    string public constant REQUIRED_PREFIX = "zkcontext-";
+    string public constant REQUIRED_PREFIX = "zkmemory-";
 
     struct OrgData {
-        string  label;        // the chosen org label without ".eth", e.g. "zkcontext-istanbulhospital"
+        string  label;        // the chosen org label without ".eth", e.g. "zkmemory-istanbulhospital"
         bool    registered;
     }
 
@@ -380,9 +380,9 @@ contract ZkcaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC16
         returns (string memory)
     {
         bytes32 k = keccak256(bytes(key));
-        if (k == keccak256("zkca:partners")) return orgPartners[orgNode];
-        if (k == keccak256("zkca:platform")) return "zkcontextauth";
-        if (k == keccak256("zkca:org")) return orgs[orgNode].label;
+        if (k == keccak256("zkma:partners")) return orgPartners[orgNode];
+        if (k == keccak256("zkma:platform")) return "zkmemoryauthorization";
+        if (k == keccak256("zkma:org")) return orgs[orgNode].label;
         return "";
     }
 
@@ -395,13 +395,13 @@ contract ZkcaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC16
         if (!u.exists) return "";
 
         bytes32 k = keccak256(bytes(key));
-        if (k == keccak256("zkca:role"))             return u.role;
-        if (k == keccak256("zkca:namespaces"))       return u.namespaces;
-        if (k == keccak256("zkca:max-tag"))          return u.maxTag;
-        if (k == keccak256("zkca:expiry"))           return _u64ToString(u.expiry);
-        if (k == keccak256("zkca:revoked"))          return u.revoked ? "true" : "false";
-        if (k == keccak256("zkca:proof-commitment")) return _bytes32ToHex(u.proofCommitment);
-        if (k == keccak256("zkca:org"))              return orgs[orgNode].label;
+        if (k == keccak256("zkma:role"))             return u.role;
+        if (k == keccak256("zkma:namespaces"))       return u.namespaces;
+        if (k == keccak256("zkma:max-tag"))          return u.maxTag;
+        if (k == keccak256("zkma:expiry"))           return _u64ToString(u.expiry);
+        if (k == keccak256("zkma:revoked"))          return u.revoked ? "true" : "false";
+        if (k == keccak256("zkma:proof-commitment")) return _bytes32ToHex(u.proofCommitment);
+        if (k == keccak256("zkma:org"))              return orgs[orgNode].label;
         return "";
     }
 

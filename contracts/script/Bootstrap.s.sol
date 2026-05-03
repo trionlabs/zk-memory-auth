@@ -4,12 +4,12 @@ pragma solidity ~0.8.17;
 import "forge-std/Script.sol";
 
 import {INameWrapper} from "../src/contracts/wrapper/INameWrapper.sol";
-import {ZkcaResolver} from "../src/zkca/ZkcaResolver.sol";
+import {ZkmaResolver} from "../src/zkma/ZkmaResolver.sol";
 
-/// @notice One-shot deploy of the ZkcaResolver to Sepolia. The contract is now standalone:
+/// @notice One-shot deploy of the ZkmaResolver to Sepolia. The contract is now standalone:
 ///         no parent name to wrap, no org subnames to mint at deploy time. Each org
 ///         registers itself by calling `registerOrg(label)` after registering their own
-///         `zkcontext-<orgname>.eth` on the Sepolia ENS app.
+///         `zkmemory-<orgname>.eth` on the Sepolia ENS app.
 ///
 /// Required env:
 ///   PLATFORM_KEY          private key of any wallet with Sepolia ETH (just pays the deploy)
@@ -26,20 +26,20 @@ contract Bootstrap is Script {
         address platform = vm.addr(platformKey);
 
         vm.startBroadcast(platformKey);
-        ZkcaResolver resolver = new ZkcaResolver(INameWrapper(NAME_WRAPPER));
+        ZkmaResolver resolver = new ZkmaResolver(INameWrapper(NAME_WRAPPER));
         vm.stopBroadcast();
 
-        console.log("ZkcaResolver:", address(resolver));
+        console.log("ZkmaResolver:", address(resolver));
 
         string memory j = string.concat(
             '{\n',
             '  "chainId": 11155111,\n',
             '  "ensRegistry": "', vm.toString(ENS_REGISTRY), '",\n',
             '  "nameWrapper": "', vm.toString(NAME_WRAPPER), '",\n',
-            '  "zkcaResolver": "', vm.toString(address(resolver)), '",\n',
+            '  "zkmaResolver": "', vm.toString(address(resolver)), '",\n',
             '  "deployBlock": ', vm.toString(block.number), ',\n',
             '  "platformAddr": "', vm.toString(platform), '",\n',
-            '  "requiredPrefix": "zkcontext-",\n',
+            '  "requiredPrefix": "zkmemory-",\n',
             '  "orgs": {}\n',
             '}\n'
         );

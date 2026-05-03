@@ -9,12 +9,12 @@ dst=../packages/contracts-types/src
 
 mkdir -p "$dst/abi" "$dst/deployments"
 
-cp out/ZkcaResolver.sol/ZkcaResolver.json "$dst/abi/ZkcaResolver.json"
-echo "→ refreshed $dst/abi/ZkcaResolver.json"
+cp out/ZkmaResolver.sol/ZkmaResolver.json "$dst/abi/ZkmaResolver.json"
+echo "-> refreshed $dst/abi/ZkmaResolver.json"
 
 if [[ -f deployments/sepolia.json ]]; then
   cp deployments/sepolia.json "$dst/deployments/sepolia.json"
-  echo "→ refreshed $dst/deployments/sepolia.json"
+  echo "-> refreshed $dst/deployments/sepolia.json"
 else
-  echo "× no deployments/sepolia.json yet — run Bootstrap first" >&2
+  echo "x no deployments/sepolia.json yet - run Bootstrap first" >&2
 fi
