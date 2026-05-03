@@ -367,14 +367,15 @@ button {
   align-self: center;
 }
 
-/* Lattice: hero memory grid with rotating identity beams.
- * Cells use aspect-ratio so the whole grid scales with its column width. */
+/* Lattice: hero memory grid — 3×3, one row per domain. Icons only.
+ * Two floating identity beams cycle in/out per tick to show the gateway
+ * granting one (allow) and refusing another (deny). */
 .lattice {
-  --lattice-gap: var(--s2);
+  --lattice-gap: var(--s3);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--lattice-gap);
-  padding: var(--s3);
+  padding: var(--s5);
   border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--bg-1) 72%, transparent);
   border: 1px solid var(--border-1);
@@ -383,12 +384,9 @@ button {
 
 .lattice-cell {
   position: relative;
-  aspect-ratio: 1.18 / 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: var(--s3);
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--bg-2) 50%, transparent);
   border: 1px solid var(--border-0);
@@ -401,6 +399,27 @@ button {
     box-shadow var(--duration-normal) var(--ease-out);
 }
 
+/* Tiny domain dot in the top-right corner — encodes the cell's domain
+ * without any label text. Pairs with beam color to make match vs mismatch
+ * legible at a glance. */
+.lattice-cell::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cell-tone, transparent);
+  opacity: 0.55;
+}
+.lattice-cell[data-domain="med"] { --cell-tone: #6c98e8; }
+.lattice-cell[data-domain="ins"] { --cell-tone: #c89557; }
+.lattice-cell[data-domain="hr"]  { --cell-tone: #7f9c66; }
+[data-theme="dark"] .lattice-cell[data-domain="med"] { --cell-tone: #8fb3df; }
+[data-theme="dark"] .lattice-cell[data-domain="ins"] { --cell-tone: #d2a373; }
+[data-theme="dark"] .lattice-cell[data-domain="hr"]  { --cell-tone: #9eb98a; }
+
 .lattice-cell-active {
   background: color-mix(in srgb, var(--bg-1) 70%, transparent);
   border-color: var(--border-2);
@@ -410,86 +429,46 @@ button {
 .lattice-icon {
   display: inline-grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  color: var(--fg-3);
-  opacity: 0.9;
-}
-.lattice-icon svg { width: 18px; height: 18px; }
-
-.lattice-label {
-  font-family: var(--font-mono);
-  font-size: clamp(10px, 1vw, var(--text-xs));
-  line-height: 1.2;
-  letter-spacing: 0;
-  color: var(--fg-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.lattice-cell-active .lattice-icon { color: var(--fg-1); opacity: 1; }
-.lattice-cell-active .lattice-label { color: var(--fg-0); }
-
-/* The floating identity beam (status label + agent handle pill). */
-.lattice-beam {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  pointer-events: none;
-  animation: lattice-beam-in 380ms var(--ease-spring) both;
-}
-.lattice-beam-status {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0;
   color: var(--fg-3);
   opacity: 0.85;
 }
+.lattice-icon svg { width: 30px; height: 30px; }
+.lattice-cell-active .lattice-icon { color: var(--fg-1); opacity: 1; }
+
+/* Floating handle pill. Color is allow-vs-deny only — agent identity is
+ * shown by the handle text itself, not by per-agent color. */
+.lattice-beam {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: lattice-beam-in 380ms var(--ease-spring) both;
+}
 .lattice-beam-handle {
+  display: inline-block;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0;
-  padding: 3px 9px;
+  padding: 3px 10px;
   border-radius: var(--radius-full);
   white-space: nowrap;
-  border: 1px solid currentColor;
   background: var(--bg-0);
   box-shadow: var(--shadow-md);
+  border: 1px solid currentColor;
 }
 
-/* Agent palettes: domain-tinted handle pills. */
-.beam-alice  { --beam: #6c98e8; }   /* med / blue */
-.beam-jane   { --beam: #c89557; }   /* ins / amber */
-.beam-sara   { --beam: #7f9c66; }   /* hr / olive */
-.beam-parent { --beam: #79a892; }   /* fam / teal */
-.beam-sam    { --beam: #c97a93; }   /* sales / rose */
-
-[data-theme="dark"] .beam-alice  { --beam: #8fb3df; }
-[data-theme="dark"] .beam-jane   { --beam: #d2a373; }
-[data-theme="dark"] .beam-sara   { --beam: #9eb98a; }
-[data-theme="dark"] .beam-parent { --beam: #97c1ad; }
-[data-theme="dark"] .beam-sam    { --beam: #d99cae; }
-
-.lattice-beam .lattice-beam-handle {
-  color: color-mix(in srgb, var(--beam) 95%, var(--fg-0));
-  background: color-mix(in srgb, var(--beam) 22%, var(--bg-0));
-  border-color: color-mix(in srgb, var(--beam) 50%, transparent);
+.beam-allowed .lattice-beam-handle {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, var(--bg-0));
+  border-color: color-mix(in srgb, var(--success) 50%, transparent);
 }
-
-/* Denied beams desaturate slightly so allow/deny read at a glance. */
-.beam-denied .lattice-beam-handle { opacity: 0.78; }
-.beam-denied .lattice-beam-status { color: var(--danger); }
-.beam-allowed .lattice-beam-status { color: var(--success); }
+.beam-denied .lattice-beam-handle {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, var(--bg-0));
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
 
 @keyframes lattice-beam-in {
   from {
