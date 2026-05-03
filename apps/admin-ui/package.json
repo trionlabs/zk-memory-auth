@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "predev": "node scripts/copy-circuit.mjs",
-    "dev": "next dev --turbopack -p 3030",
+    "dev": "next dev --webpack -p 3030",
     "prebuild": "node scripts/copy-circuit.mjs",
     "build": "next build",
     "start": "next start",

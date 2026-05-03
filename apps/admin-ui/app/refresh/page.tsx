@@ -5,7 +5,7 @@ import { useAccount } from "wagmi";
 import { namehash } from "viem";
 import { TxButton } from "@/components/tx-button";
 import { WalletButton } from "@/components/wallet-button";
-import type { WorkerInput, WorkerProgress } from "./proof-worker";
+import type { WorkerInput, WorkerProgress } from "./proof-worker-types";
 
 /**
  * /refresh - the user-side page where someone with a registered subname
@@ -362,9 +362,9 @@ export default function RefreshPage() {
         )}
 
         {state.kind === "error" && (
-          <div className="rounded-lg border border-red-700 bg-red-950/30 px-4 py-3 text-xs text-red-200 font-mono">
+          <pre className="rounded-lg border border-red-700 bg-red-950/30 px-4 py-3 text-[11px] text-red-200 font-mono whitespace-pre-wrap break-words overflow-auto max-h-96">
             {state.message}
-          </div>
+          </pre>
         )}
 
         {state.kind === "done" && (

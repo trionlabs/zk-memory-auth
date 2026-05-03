@@ -11,36 +11,14 @@ import { Noir } from "@noir-lang/noir_js";
 import { UltraHonkBackend } from "@aztec/bb.js";
 import { generateInputs } from "noir-jwt";
 import { keccak256 } from "viem";
+import type { WorkerInput, WorkerProgress } from "./proof-worker-types";
+
+export type { WorkerInput, WorkerProgress };
 
 const MAX_PARTIAL_DATA_LENGTH = 1024;
 const MAX_EMAIL_LENGTH = 100;
 const MAX_AUD_LENGTH = 128;
 const MAX_ISS_LENGTH = 64;
-
-export type WorkerInput = {
-  jwt: string;
-  /** JsonWebKey of the Google RSA pubkey that signed the JWT (n + e). */
-  pubkeyJwk: JsonWebKey;
-  /** The email Google verified for this user (must match the JWT's claim). */
-  email: string;
-  /** OAuth audience the JWT was issued for. */
-  aud: string;
-  /** JWT issuer; for Google id-tokens this is "https://accounts.google.com". */
-  iss: string;
-  /** iat freshness window. */
-  iatLower: number;
-  iatUpper: number;
-};
-
-export type WorkerProgress =
-  | { kind: "progress"; step: string }
-  | {
-      kind: "done";
-      proofHex: `0x${string}`;
-      publicInputsHex: `0x${string}`;
-      commitment: `0x${string}`;
-    }
-  | { kind: "error"; message: string };
 
 function pad(arr: Uint8Array, capacity: number): { storage: number[]; len: number } {
   const storage = new Array<number>(capacity).fill(0);
@@ -54,7 +32,7 @@ self.onmessage = async (ev: MessageEvent<WorkerInput>) => {
   try {
     const input = ev.data;
     post({ kind: "progress", step: "fetching circuit artifact" });
-    const artifactRes = await fetch("/circuit/zkma_auth.json");
+    const artifactRes = await fetch("/circuit/zkma_auth.json?v=" + Date.now());
     if (!artifactRes.ok) throw new Error(`circuit artifact fetch failed: ${artifactRes.status}`);
     const circuit = await artifactRes.json();
 
@@ -118,6 +96,7 @@ self.onmessage = async (ev: MessageEvent<WorkerInput>) => {
 
     post({ kind: "done", proofHex, publicInputsHex, commitment });
   } catch (e) {
-    post({ kind: "error", message: (e as Error).message });
+    const err = e as Error;
+    post({ kind: "error", message: err.stack ?? err.message });
   }
 };
