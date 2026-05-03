@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { sepoliaDeployment } from "@zkma/contracts-types";
 import { OrgList } from "@/components/org-list";
 import { WalletButton } from "@/components/wallet-button";
@@ -23,7 +24,15 @@ export default function Home() {
             · prefix <code className="text-zinc-300">{requiredPrefix}</code>
           </p>
         </div>
-        <WalletButton />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/refresh"
+            className="text-xs px-3 py-1.5 rounded border border-zinc-700 text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100 transition"
+          >
+            refresh proof →
+          </Link>
+          <WalletButton />
+        </div>
       </header>
 
       <main className="flex-1 px-6 py-8 max-w-5xl w-full mx-auto space-y-6">
