@@ -160,8 +160,7 @@ Then in the admin UI, register `zkmemory-<orgname>.eth` and mint user subnames. 
 To verify wildcard ENS resolution end-to-end on live Sepolia:
 
 ```bash
-cd contracts
-node script/smoke.mjs
+pnpm --filter @zkma/gateway live:smoke
 ```
 
 ## Security model (what the proof actually attests to)

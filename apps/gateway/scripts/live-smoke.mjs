@@ -1,15 +1,15 @@
-// Self-contained Sepolia smoke for zkmemoryauthorization v2.
+// Live Sepolia smoke for zk-memory-authorization.
 // Discovers all registered orgs via OrgRegistered events, then for each org
 // discovers users via UserRegistered events, then verifies every user's records
 // resolve via standard ENS lookup (i.e., end-to-end through walk-up + ZkmaResolver).
 //
-// Usage (from contracts/):
-//   npm install --no-save viem@2
-//   node script/smoke.mjs
+// Lives under apps/gateway/scripts so viem (a gateway dep) resolves without
+// extra installs. Run from the workspace root:
+//   pnpm --filter @zkma/gateway exec node scripts/live-smoke.mjs
 
 import { createPublicClient, http, parseAbiItem } from "viem";
 import { sepolia } from "viem/chains";
-import deployment from "../../packages/contracts-types/src/deployments/sepolia.json" with { type: "json" };
+import deployment from "../../../packages/contracts-types/src/deployments/sepolia.json" with { type: "json" };
 
 const RPC = "https://ethereum-sepolia-rpc.publicnode.com";
 const RESOLVER = deployment.zkmaResolver;

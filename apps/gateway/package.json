@@ -12,7 +12,8 @@
     "test:http": "tsx scripts/test-http-flow.ts",
     "test:mem0": "tsx scripts/test-mem0-real.ts",
     "test:claims": "tsx scripts/test-claims-unit.ts",
-    "stub:openai": "tsx scripts/stub-openai.ts"
+    "stub:openai": "tsx scripts/stub-openai.ts",
+    "live:smoke": "node scripts/live-smoke.mjs"
   },
   "dependencies": {
     "@aztec/bb.js": "3.0.0-nightly.20251104",
