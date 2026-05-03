@@ -191,6 +191,7 @@ async function main(): Promise<void> {
   };
   function makeServer(opts: FakeOpts = {}) {
     const seenSearches: { query: string; orgLabel: string }[] = [];
+    const seenWrites: { meta: unknown; content: string; userId: string }[] = [];
     const fastify = buildServer({
       logger: false,
       resolvePrincipal: async (subname): Promise<ResolvedPrincipal | null> => {
@@ -216,8 +217,43 @@ async function main(): Promise<void> {
         seenSearches.push({ query, orgLabel: principal.orgLabel });
         return [{ id: "m1", memory: "patient 304 amox 500mg", metadata: { tag: "confidential" } }];
       },
+      postMemory: async (meta, content, userId) => {
+        seenWrites.push({ meta, content, userId });
+        return { id: "mock-write-id" };
+      },
     });
-    return { fastify, seenSearches };
+    return { fastify, seenSearches, seenWrites };
+  }
+
+  // Sign a write-request body. Mirrors the search version but for the write payload shape.
+  async function signedWriteRequest(
+    server: ReturnType<typeof makeServer>,
+    body: {
+      content: string;
+      namespace: string;
+      tag: string;
+      sharedWith?: string[];
+    },
+  ) {
+    const subname = "aysel.zkmemory-istanbulhospital.eth";
+    const challengeRes = await server.fastify.inject({
+      method: "GET",
+      url: `/challenge?subname=${encodeURIComponent(subname)}`,
+    });
+    const { nonce } = challengeRes.json() as { nonce: string };
+
+    const fullBody = { subname, proof: proofHex, publicInputs: publicInputsHex, ...body };
+    const requestHash = keccak256(new TextEncoder().encode(JSON.stringify(fullBody)));
+    const domainHash = keccak256(new TextEncoder().encode(GATEWAY_DOMAIN));
+    const challenge = keccak256(
+      new Uint8Array([
+        ...Buffer.from(domainHash.replace(/^0x/, ""), "hex"),
+        ...Buffer.from(nonce.replace(/^0x/, ""), "hex"),
+        ...Buffer.from(requestHash.replace(/^0x/, ""), "hex"),
+      ]),
+    );
+    const sig = await wallet.signMessage({ message: { raw: challenge } });
+    return { body: fullBody, nonce, sig };
   }
 
   // Build a single signed search request once - cases reuse the body where applicable.
@@ -372,6 +408,166 @@ async function main(): Promise<void> {
       payload: { query: "x", subname: "a.b.eth", proof: "0x00", publicInputs: "0x00" },
     });
     check("status 401", r.statusCode === 401);
+    await s.fastify.close();
+  }
+
+  // ───────────── WRITE PATH (POST /v1/memories) ─────────────
+
+  console.log("\n[case] write: happy path");
+  {
+    const s = makeServer();
+    const { body, nonce, sig } = await signedWriteRequest(s, {
+      content: "patient 304 amox 500mg tid",
+      namespace: "clinical",
+      tag: "confidential",
+      sharedWith: [],
+    });
+    const r = await s.fastify.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: { "x-zkma-nonce": nonce, "x-zkma-sig": sig, "content-type": "application/json" },
+      payload: body,
+    });
+    check("status 200", r.statusCode === 200, `got ${r.statusCode}: ${r.body}`);
+    check("postMemory was called once", s.seenWrites.length === 1);
+    const w = s.seenWrites[0]!;
+    const meta = w.meta as { ownerOrgLabel: string; namespace: string; tag: string };
+    check("ownerOrgLabel locked to principal's org", meta.ownerOrgLabel === "zkmemory-istanbulhospital");
+    check("namespace forwarded", meta.namespace === "clinical");
+    check("tag forwarded", meta.tag === "confidential");
+    check("user_id is the subname", w.userId === "aysel.zkmemory-istanbulhospital.eth");
+    await s.fastify.close();
+  }
+
+  console.log("\n[case] write: tag above principal's max-tag -> 403");
+  {
+    const s = makeServer();
+    const { body, nonce, sig } = await signedWriteRequest(s, {
+      content: "psych eval",
+      namespace: "clinical",
+      tag: "restricted", // principal max is confidential
+    });
+    const r = await s.fastify.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: { "x-zkma-nonce": nonce, "x-zkma-sig": sig, "content-type": "application/json" },
+      payload: body,
+    });
+    check("status 403", r.statusCode === 403);
+    check("postMemory NOT called", s.seenWrites.length === 0);
+    check(
+      "error mentions max-tag",
+      (r.json() as { error: string }).error.includes("max-tag"),
+    );
+    await s.fastify.close();
+  }
+
+  console.log("\n[case] write: namespace not in principal's set -> 403");
+  {
+    const s = makeServer();
+    const { body, nonce, sig } = await signedWriteRequest(s, {
+      content: "Q3 margin",
+      namespace: "executive", // principal has clinical+operational only
+      tag: "confidential",
+    });
+    const r = await s.fastify.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: { "x-zkma-nonce": nonce, "x-zkma-sig": sig, "content-type": "application/json" },
+      payload: body,
+    });
+    check("status 403", r.statusCode === 403);
+    check(
+      "error mentions namespace",
+      (r.json() as { error: string }).error.includes("namespace"),
+    );
+    await s.fastify.close();
+  }
+
+  console.log("\n[case] write: invalid tag enum -> 400");
+  {
+    const s = makeServer();
+    const { body, nonce, sig } = await signedWriteRequest(s, {
+      content: "x",
+      namespace: "clinical",
+      tag: "ULTRA_SECRET",
+    });
+    const r = await s.fastify.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: { "x-zkma-nonce": nonce, "x-zkma-sig": sig, "content-type": "application/json" },
+      payload: body,
+    });
+    check("status 400", r.statusCode === 400);
+    await s.fastify.close();
+  }
+
+  console.log("\n[case] write: revoked principal -> 403");
+  {
+    const s = makeServer({ revoked: true });
+    const { body, nonce, sig } = await signedWriteRequest(s, {
+      content: "x",
+      namespace: "clinical",
+      tag: "confidential",
+    });
+    const r = await s.fastify.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: { "x-zkma-nonce": nonce, "x-zkma-sig": sig, "content-type": "application/json" },
+      payload: body,
+    });
+    check("status 403", r.statusCode === 403);
+    check("error reason 'revoked'", (r.json() as { error: string }).error === "revoked");
+    check("postMemory NOT called", s.seenWrites.length === 0);
+    await s.fastify.close();
+  }
+
+  console.log("\n[case] write: nonce replay -> 401 on second use");
+  {
+    const s = makeServer();
+    const { body, nonce, sig } = await signedWriteRequest(s, {
+      content: "x",
+      namespace: "clinical",
+      tag: "confidential",
+    });
+    const first = await s.fastify.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: { "x-zkma-nonce": nonce, "x-zkma-sig": sig, "content-type": "application/json" },
+      payload: body,
+    });
+    check("first call ok", first.statusCode === 200);
+    const second = await s.fastify.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: { "x-zkma-nonce": nonce, "x-zkma-sig": sig, "content-type": "application/json" },
+      payload: body,
+    });
+    check("second call 401", second.statusCode === 401);
+    await s.fastify.close();
+  }
+
+  console.log("\n[case] write: cross-org sharedWith preserved in meta");
+  {
+    const s = makeServer();
+    const { body, nonce, sig } = await signedWriteRequest(s, {
+      content: "claim C-44128",
+      namespace: "clinical", // nurse can write clinical
+      tag: "confidential",
+      sharedWith: ["zkmemory-acmeinsurance"],
+    });
+    const r = await s.fastify.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: { "x-zkma-nonce": nonce, "x-zkma-sig": sig, "content-type": "application/json" },
+      payload: body,
+    });
+    check("status 200", r.statusCode === 200);
+    const meta = s.seenWrites[0]?.meta as { sharedWith: string[] } | undefined;
+    check(
+      "sharedWith forwarded",
+      Array.isArray(meta?.sharedWith) && meta.sharedWith.includes("zkmemory-acmeinsurance"),
+    );
     await s.fastify.close();
   }
 
