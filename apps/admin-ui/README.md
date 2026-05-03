@@ -31,8 +31,9 @@ The Sepolia RPC is pinned to `https://ethereum-sepolia-rpc.publicnode.com` (no `
 | Action | Contract call | Authorized signer |
 |---|---|---|
 | Register org | `ZkmaResolver.registerOrg(label)` | the wrapped owner of `<label>.eth` |
-| Register user | `ZkmaResolver.registerUser(orgNode, label, addr, role, namespaces, maxTag, expiry)` | org admin |
+| Register user | `ZkmaResolver.registerUser(orgNode, label, addr, emailHash, role, namespaces, maxTag, expiry)` | org admin |
 | Edit user | `ZkmaResolver.updateUser(orgNode, label, role, namespaces, maxTag, expiry)` | org admin |
+| Rotate email hash | `ZkmaResolver.setEmailHash(orgNode, label, emailHash)` | org admin |
 | Revoke user | `ZkmaResolver.revokeUser(orgNode, label)` | org admin |
 | Set partners | `ZkmaResolver.setPartners(orgNode, csv)` | org admin |
 | Set proof commitment | `ZkmaResolver.setProofCommitment(orgNode, label, commitment32)` | the user wallet only |

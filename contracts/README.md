@@ -1,107 +1,113 @@
 # @zkma/contracts
 
-Smart contracts for **zkmemoryauthorization** - programmable, portable, verifiable authorization for AI agent memory, anchored on ENS.
+Solidity contracts for **zk-memory-authorization** — the on-chain trust kernel for AI agent memory authorization, anchored on ENS.
+
+Live on Sepolia: [`0x842719526d0265f169a066DE6Dd4451b31141043`](https://sepolia.etherscan.io/address/0x842719526d0265f169a066DE6Dd4451b31141043).
 
 ## Architecture
 
+Each organization owns its own `zkmemory-<orgname>.eth` directly on ENS — there is no platform parent name. The single contract `ZkmaResolver` is registered as the resolver for each org's name, plus all of that org's user subnames.
+
 ```
-zkmemoryauthorization.eth                               [wrapped, owner=platform, resolver=ZkmaResolver]
-  ├── istanbulhospital.zkmemoryauthorization.eth      [wrapped subname, owner=adminA, resolver=ZkmaResolver]
-  │     ├── aysel....                                  [virtual via ENSIP-10 wildcard]
-  │     ├── mert....                                   [virtual]
-  │     └── dr-yildiz....                              [virtual]
-  └── acmeinsurance.zkmemoryauthorization.eth         [wrapped subname, owner=adminB, resolver=ZkmaResolver]
-        └── claims-bot....                             [virtual]
+zkmemory-istanbulhospital.eth                     [wrapped, owner=adminA, resolver=ZkmaResolver]
+  ├── aysel.zkmemory-istanbulhospital.eth         [wrapped subname, owner=aysel's wallet, resolver=ZkmaResolver]
+  ├── mert.zkmemory-istanbulhospital.eth          [wrapped subname, owner=mert's wallet, resolver=ZkmaResolver]
+  └── dr-yildiz.zkmemory-istanbulhospital.eth     [wrapped subname, owner=admin's wallet, resolver=ZkmaResolver]
+
+zkmemory-acmeinsurance.eth                        [separate org, separate admin]
+  └── claims-bot.zkmemory-acmeinsurance.eth
 ```
 
-- **`zkmemoryauthorization.eth`** is wrapped via NameWrapper (CANNOT_UNWRAP).
-- **Org subnames** (`istanbulhospital`, `acmeinsurance`) are real wrapped ERC-1155 subnames owned by their respective admin wallets - visible on Sepolia ENS app, Etherscan, OpenSea.
-- **User subnames** (`aysel`, `mert`, `dr-yildiz`, `claims-bot`) are *virtual*: they don't exist in the ENS registry, but standard viem resolution returns them via ENSIP-10 wildcard from `ZkmaResolver` (which is the resolver for each org subname).
-- **`ZkmaResolver`** is a single contract that simultaneously serves direct text/addr queries (org-level) and wildcard `resolve(name, data)` queries (user-level).
+- The `zkmemory-` prefix is enforced at `registerOrg` so a UI can scan ENS for opted-in orgs. Anyone can register `zkmemory-anything.eth` so the prefix is a discoverability marker, not a security claim.
+- User subnames are **real wrapped ERC-1155 subnames** minted by `registerUser` — they appear in the ENS app, OpenSea, the user's wallet inventory.
+- `ZkmaResolver` implements `IExtendedResolver` (ENSIP-10 wildcard), `ITextResolver`, and `IAddrResolver`, so standard ENS tooling (viem, ethers, ENS app) reads our records without custom code.
 
 ### Trust kernel
 
 | Action | Authorized signer | Enforced by |
 |---|---|---|
-| Mint org subname | Platform owner of `zkmemoryauthorization.eth` | NameWrapper.setSubnodeRecord |
-| Register user, update role/namespaces/maxTag/expiry, set partners, revoke user | Org admin (current `nameWrapper.ownerOf(orgNode)`) | `onlyOrgAdmin` modifier |
-| Update proof commitment | The user's own wallet (write-once `userAddr`, set at registration) | `onlyUser` check |
+| `registerOrg(label)` | wallet that owns `<label>.eth` (via NameWrapper) and approved this resolver | inline check + `nameWrapper.ownerOf` |
+| `registerUser`, `updateUser`, `setEmailHash`, `setPartners`, `revokeUser` | current org admin (`nameWrapper.ownerOf(orgNode)`) | `onlyOrgAdmin` modifier |
+| `setProofCommitment` | the user's own wallet (`userAddr`, write-once at `registerUser`) | `onlyUser` check |
 
-`userAddr` is set at registration and *never* mutated afterwards - the contract has no setter for it. This is the load-bearing invariant: the org admin can revoke or downgrade a user but cannot impersonate them in the per-request signature flow (PRD §15.3), because impersonation requires signing as `userAddr` and the admin cannot rotate it.
+`userAddr` is set once and never mutated. The contract has no setter for it. Even a compromised admin can revoke or downgrade a user but cannot impersonate them in the per-request signature flow because impersonation requires signing as `userAddr`.
 
 ### Text record schema
 
 | Key | Level | Writer | Reader-side parse |
 |---|---|---|---|
-| `zkma:role` | user | admin | string (`"nurse"`, `"resident"`, `"admin"`, `"claims-agent"`, ...) |
+| `zkma:role` | user | admin | string (`"nurse"`, `"resident"`, `"admin"`, `"claims-agent"`, …) |
 | `zkma:namespaces` | user | admin | comma-separated (`"clinical,operational"`) |
 | `zkma:max-tag` | user | admin | string (`"public"` < `"internal"` < `"confidential"` < `"restricted"`) |
 | `zkma:expiry` | user | admin | uint64 unix seconds (string) |
 | `zkma:revoked` | user | admin | `"true"` / `"false"` |
+| `zkma:email-hash` | user | admin | hex string of `keccak256(email)`; gateway pins proof's `expected_email` to this |
 | `zkma:proof-commitment` | user | **user only** | hex string (`"0x..."`, 32 bytes) |
 | `zkma:partners` | org | admin | comma-separated ENS names |
-| `zkma:platform` | parent | n/a (constant) | `"zkmemoryauthorization"` |
-| `zkma:version` | parent | n/a (constant) | `"0.1.0"` |
+| `zkma:platform` | org | constant | `"zkmemoryauthorization"` |
+| `zkma:org` | org / user | constant | the org's full label, e.g. `"zkmemory-istanbulhospital"` |
 
 `addr(node)` returns the user's wallet for user-level queries (used by the gateway for per-request ECDSA signature verification per PRD §15.3) and the org admin for org-level queries.
 
-## Deploy to Sepolia
-
-### One-time setup
+## Local development
 
 ```bash
 forge install
 forge build
-forge test                      # 20/20 should pass
-
-cp .env.example .env
-# edit .env: set SEPOLIA_RPC_URL, ETHERSCAN_API_KEY, PLATFORM_KEY (the wallet
-# that pays for the resolver deploy - only this wallet's tx is on-chain).
+forge test                      # 29/29 should pass
 ```
 
-### Deploy the resolver
+## Deploy to Sepolia
+
+Set `PLATFORM_KEY` (your wallet's private key) and `SEPOLIA_RPC_URL` in your shell — never write the key to a file. Then:
 
 ```bash
-source .env
+PLATFORM_KEY=0x... \
+  SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com \
+  forge script script/Bootstrap.s.sol:Bootstrap \
+    --rpc-url $SEPOLIA_RPC_URL --broadcast --slow
 
-forge script script/Bootstrap.s.sol:Bootstrap \
-  --rpc-url $SEPOLIA_RPC_URL --broadcast --verify
-
-bash script/export-types.sh     # refreshes packages/contracts-types from the new address
+bash script/export-types.sh     # mirrors the new address into packages/contracts-types
 ```
 
-That's it for the contracts side. Org admins onboard themselves through the admin UI: register their own `zkmemory-<orgname>.eth` on the Sepolia ENS app, connect to the UI, and the form walks them through wrap -> approve -> `registerOrg` -> `registerUser` for each member.
+The wallet just pays the deploy gas (~3.03M gas, sub-cent on Sepolia) — the contract has no platform-level privileges, so the deployer wallet can be discarded after deploy.
 
-### E2E smoke test (the only test that actually proves wildcard resolution works on live Sepolia)
+### Live smoke
 
-`forge test` deploys ENS locally and proves contract logic, but cannot prove ENS walk-up routes correctly to our wildcard resolver on the live network - for that you need to hit Sepolia. From `contracts/`:
+`forge test` proves contract logic against a locally-deployed ENS but cannot prove ENS walk-up routes correctly to our wildcard resolver on Sepolia. For that, run from the workspace root:
 
 ```bash
-npm install --no-save viem@2
-SEPOLIA_RPC_URL=https://... node script/smoke.mjs
+pnpm --filter @zkma/gateway exec node ../../apps/gateway/scripts/live-smoke.mjs
 ```
 
-The script queries `getEnsText` and `getEnsAddress` for the platform name, both org subnames, and all four demo users, and asserts each expected value. Pass = wildcard resolution is wired correctly and the gateway / admin UI Just Work without any custom ENS code.
+The script discovers all registered orgs via `OrgRegistered` events, then per-org users via `UserRegistered`, and asserts every text record resolves through standard ENS lookup. Pass = wildcard resolution is wired correctly.
 
 ## Consuming from the rest of the monorepo
 
 ```ts
-import { ZkmaResolverAbi, ZkmaTextKeys, getSepoliaDeployment } from "@zkma/contracts-types";
+import { ZkmaResolverAbi, ZkmaTextKeys, sepoliaDeployment } from "@zkma/contracts-types";
+import { keccak256, toBytes } from "viem";
 
-const deployment = await getSepoliaDeployment();
-const hospitalNode = deployment.orgs.istanbulhospital.node;
-
-// admin UI write:
+// admin UI write at user registration time:
+const emailHash = keccak256(toBytes(email.toLowerCase()));
 await walletClient.writeContract({
-  address: deployment.zkmaResolver,
+  address: sepoliaDeployment.zkmaResolver,
   abi: ZkmaResolverAbi,
   functionName: "registerUser",
-  args: [hospitalNode, "newuser", userAddr, "nurse", "clinical", "confidential", expiry],
+  args: [orgNode, "newuser", userAddr, emailHash, "nurse", "clinical", "confidential", expiry],
 });
 
 // gateway read (no contract ABI needed - standard ENS):
 const role = await publicClient.getEnsText({
-  name: "aysel.istanbulhospital.zkmemoryauthorization.eth",
+  name: "aysel.zkmemory-istanbulhospital.eth",
   key: ZkmaTextKeys.Role,
 });
 ```
+
+## Files
+
+- `src/zkma/ZkmaResolver.sol` — single resolver contract with all read/write paths.
+- `src/contracts/` — vendored copy of ENS contracts (registry, wrapper, resolvers) for local testing and the deploy script's compile-time deps.
+- `script/Bootstrap.s.sol` — one-shot deploy script.
+- `script/export-types.sh` — copies the latest forge artifacts into `packages/contracts-types`.
+- `test/ZkmaResolver.t.sol` — 29 forge tests including event emission and trust-kernel regressions.

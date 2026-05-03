@@ -24,7 +24,8 @@ export type Deployment = {
 /** Sepolia deployment, written by `forge script Bootstrap.s.sol`. */
 export const sepoliaDeployment = sepolia as unknown as Deployment;
 
-/** ENS text record keys served by ZkmaResolver. */
+/** ENS text record keys served by ZkmaResolver. Keep this list strictly in
+ *  sync with the keys the contract responds to in `_userText` / `_orgText`. */
 export const ZkmaTextKeys = {
   Role: "zkma:role",
   Namespaces: "zkma:namespaces",
@@ -32,7 +33,8 @@ export const ZkmaTextKeys = {
   Expiry: "zkma:expiry",
   Revoked: "zkma:revoked",
   ProofCommitment: "zkma:proof-commitment",
+  EmailHash: "zkma:email-hash",
   Partners: "zkma:partners",
   Platform: "zkma:platform",
-  Version: "zkma:version",
+  Org: "zkma:org",
 } as const;
