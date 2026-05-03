@@ -43,6 +43,10 @@ contract ZkmaResolverTest is Test {
     bytes32 hospitalNode;
     bytes32 insuranceNode;
 
+    // Stand-in email hash; tests do not need a real email value.
+    bytes32 constant AYSEL_EMAIL_HASH = keccak256("aysel@istanbulhospital.org");
+    bytes32 constant BOB_EMAIL_HASH   = keccak256("bob@istanbulhospital.org");
+
     function setUp() public {
         vm.warp(365 days);
 
@@ -162,7 +166,7 @@ contract ZkmaResolverTest is Test {
 
         vm.prank(adminA);
         bytes32 userNode = resolver.registerUser(
-            hospitalNode, "aysel", aysel,
+            hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH,
             "nurse", "clinical,operational", "confidential", uint64(block.timestamp + 7 days)
         );
 
@@ -173,32 +177,62 @@ contract ZkmaResolverTest is Test {
         assertEq(resolver.text(userNode, "zkma:role"), "nurse");
         assertEq(resolver.text(userNode, "zkma:namespaces"), "clinical,operational");
         assertEq(resolver.text(userNode, "zkma:max-tag"), "confidential");
+        assertEq(resolver.text(userNode, "zkma:email-hash"), _hex(AYSEL_EMAIL_HASH));
 
         // addr returns the user's wallet (signature verification path).
         assertEq(resolver.addr(userNode), payable(aysel));
+    }
+
+    function test_setEmailHash_adminCanRotate() public {
+        _registerHospital();
+        vm.prank(adminA);
+        resolver.registerUser(
+            hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH,
+            "nurse", "clinical", "confidential", uint64(block.timestamp + 7 days)
+        );
+
+        bytes32 newHash = keccak256("aysel.new@istanbulhospital.org");
+        vm.prank(adminA);
+        resolver.setEmailHash(hospitalNode, "aysel", newHash);
+
+        bytes32 userNode = keccak256(abi.encodePacked(hospitalNode, keccak256("aysel")));
+        assertEq(resolver.text(userNode, "zkma:email-hash"), _hex(newHash));
+    }
+
+    function test_setEmailHash_revertsIfNotAdmin() public {
+        _registerHospital();
+        vm.prank(adminA);
+        resolver.registerUser(
+            hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH,
+            "nurse", "clinical", "confidential", uint64(block.timestamp + 7 days)
+        );
+
+        vm.prank(bob);
+        vm.expectRevert(ZkmaResolver.NotOrgAdmin.selector);
+        resolver.setEmailHash(hospitalNode, "aysel", BOB_EMAIL_HASH);
     }
 
     function test_registerUser_revertsIfNotAdmin() public {
         _registerHospital();
         vm.prank(bob);
         vm.expectRevert(ZkmaResolver.NotOrgAdmin.selector);
-        resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", 0);
+        resolver.registerUser(hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH, "nurse", "clinical", "confidential", 0);
     }
 
     function test_registerUser_revertsIfDuplicate() public {
         _registerHospital();
         vm.prank(adminA);
-        resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
+        resolver.registerUser(hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
         vm.prank(adminA);
         vm.expectRevert(ZkmaResolver.UserAlreadyExists.selector);
-        resolver.registerUser(hospitalNode, "aysel", bob, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
+        resolver.registerUser(hospitalNode, "aysel", bob, BOB_EMAIL_HASH, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
     }
 
     function test_registerUser_revertsIfOrgNotRegistered() public {
         // hospital is NOT registered yet.
         vm.prank(adminA);
         vm.expectRevert(ZkmaResolver.OrgNotRegistered.selector);
-        resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
+        resolver.registerUser(hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
     }
 
     // ─────────────────────────── trust kernel ───────────────────────────
@@ -206,7 +240,7 @@ contract ZkmaResolverTest is Test {
     function test_admin_cannotSetProofCommitment() public {
         _registerHospital();
         vm.prank(adminA);
-        resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
+        resolver.registerUser(hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
 
         vm.prank(adminA);
         vm.expectRevert(ZkmaResolver.NotUser.selector);
@@ -216,7 +250,7 @@ contract ZkmaResolverTest is Test {
     function test_user_canSetOwnProofCommitment() public {
         _registerHospital();
         vm.prank(adminA);
-        resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
+        resolver.registerUser(hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
 
         bytes32 c = bytes32(uint256(0xc0ffee));
         vm.prank(aysel);
@@ -229,11 +263,11 @@ contract ZkmaResolverTest is Test {
     function test_userAddr_isImmutableAfterRegistration() public {
         _registerHospital();
         vm.prank(adminA);
-        resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
+        resolver.registerUser(hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
 
         vm.prank(adminA);
         vm.expectRevert(ZkmaResolver.UserAlreadyExists.selector);
-        resolver.registerUser(hospitalNode, "aysel", bob, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
+        resolver.registerUser(hospitalNode, "aysel", bob, BOB_EMAIL_HASH, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
 
         bytes32 userNode = keccak256(abi.encodePacked(hospitalNode, keccak256("aysel")));
         assertEq(resolver.addr(userNode), payable(aysel), "userAddr survived re-registration attempt");
@@ -270,7 +304,7 @@ contract ZkmaResolverTest is Test {
     function test_resolve_userText_role_viaWildcard() public {
         _registerHospital();
         vm.prank(adminA);
-        resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical,operational", "confidential", uint64(block.timestamp + 7 days));
+        resolver.registerUser(hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH, "nurse", "clinical,operational", "confidential", uint64(block.timestamp + 7 days));
 
         bytes memory dnsName = _dns3("aysel", hospitalLabel, "eth");
         bytes32 userNode = keccak256(abi.encodePacked(hospitalNode, keccak256("aysel")));
@@ -282,7 +316,7 @@ contract ZkmaResolverTest is Test {
     function test_resolve_userAddr_viaWildcard() public {
         _registerHospital();
         vm.prank(adminA);
-        resolver.registerUser(hospitalNode, "aysel", aysel, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
+        resolver.registerUser(hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH, "nurse", "clinical", "confidential", uint64(block.timestamp + 1 days));
 
         bytes memory dnsName = _dns3("aysel", hospitalLabel, "eth");
         bytes32 userNode = keccak256(abi.encodePacked(hospitalNode, keccak256("aysel")));

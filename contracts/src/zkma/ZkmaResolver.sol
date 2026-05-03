@@ -52,6 +52,11 @@ contract ZkmaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC16
         bool    revoked;
         bool    exists;
         bytes32 proofCommitment;
+        // keccak256(email) the org admin onboarded this user with. The gateway
+        // hashes the JWT's email claim (revealed in the proof's public inputs)
+        // and asserts it matches this value. Plain email is never stored, but
+        // the hash + the JWT ties the proof to the admin's expected identity.
+        bytes32 emailHash;
     }
 
     /// orgNode => OrgData
@@ -85,6 +90,7 @@ contract ZkmaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC16
     event UserUpdated(bytes32 indexed orgNode, string userLabel);
     event UserRevoked(bytes32 indexed orgNode, string userLabel);
     event ProofCommitmentSet(bytes32 indexed orgNode, string userLabel, bytes32 commitment);
+    event EmailHashSet(bytes32 indexed orgNode, string userLabel, bytes32 emailHash);
     event PartnersSet(bytes32 indexed orgNode, string partnersCsv);
 
     constructor(INameWrapper _nameWrapper) {
@@ -125,6 +131,7 @@ contract ZkmaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC16
         bytes32 orgNode,
         string calldata userLabel,
         address userAddr,
+        bytes32 emailHash,
         string calldata role,
         string calldata namespaces,
         string calldata maxTag,
@@ -135,6 +142,7 @@ contract ZkmaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC16
         if (u.exists) revert UserAlreadyExists();
 
         u.userAddr = userAddr;
+        u.emailHash = emailHash;
         u.role = role;
         u.namespaces = namespaces;
         u.maxTag = maxTag;
@@ -151,6 +159,21 @@ contract ZkmaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC16
         nameWrapper.setSubnodeRecord(orgNode, userLabel, userAddr, address(this), 0, 0, expiry);
 
         emit UserRegistered(orgNode, userLabel, userAddr);
+        emit EmailHashSet(orgNode, userLabel, emailHash);
+    }
+
+    /// @notice Admin can rotate the email-hash binding (e.g. user changed their
+    ///         primary work email). userAddr stays write-once - the wallet
+    ///         binding does not change with this.
+    function setEmailHash(bytes32 orgNode, string calldata userLabel, bytes32 emailHash)
+        external
+        onlyOrgAdmin(orgNode)
+    {
+        bytes32 lh = keccak256(bytes(userLabel));
+        UserData storage u = users[orgNode][lh];
+        if (!u.exists) revert UserMissing();
+        u.emailHash = emailHash;
+        emit EmailHashSet(orgNode, userLabel, emailHash);
     }
 
     function updateUser(
@@ -401,6 +424,7 @@ contract ZkmaResolver is IExtendedResolver, ITextResolver, IAddrResolver, IERC16
         if (k == keccak256("zkma:expiry"))           return _u64ToString(u.expiry);
         if (k == keccak256("zkma:revoked"))          return u.revoked ? "true" : "false";
         if (k == keccak256("zkma:proof-commitment")) return _bytes32ToHex(u.proofCommitment);
+        if (k == keccak256("zkma:email-hash"))       return _bytes32ToHex(u.emailHash);
         if (k == keccak256("zkma:org"))              return orgs[orgNode].label;
         return "";
     }
