@@ -85,6 +85,17 @@ PORT=8787 \
 
 The gateway lazy-initializes the bb.js verifier on first `POST /v1/memories/search`. The first call eats ~10 seconds (CRS download + backend init); subsequent calls are sub-second.
 
+#### Verifier env vars (security-relevant)
+
+| Var | Default | Purpose |
+|---|---|---|
+| `ZKMA_GOOGLE_JWKS_URL` | `https://www.googleapis.com/oauth2/v3/certs` | Where the gateway fetches Google's RSA pubkeys for the modulus pin |
+| `ZKMA_SKIP_JWKS` | unset | `=1` skips the JWKS fetch entirely. Combine with `ZKMA_EXTRA_MODULI` for tests. **Production must leave this unset.** |
+| `ZKMA_EXTRA_MODULI` | unset | Comma-separated hex moduli to allow in addition to JWKS. Test-only. |
+| `ZKMA_SKIP_PROOF_VERIFY` | unset | `=1` skips bb.js verification entirely. Loud warning logged at startup. **Production must leave this unset.** |
+
+The default behavior of `verifyProof` is fail-closed in three layers: commitment hash match, modulus in Google JWKS, bb.js cryptographic verify. All three must pass.
+
 ### 4. Admin UI (optional for the demo narrative)
 
 ```bash
@@ -153,9 +164,21 @@ cd contracts
 node script/smoke.mjs
 ```
 
+## Security model (what the proof actually attests to)
+
+A `verifyProof` success means **all four** are true:
+
+1. The proof's `keccak256(proof || publicInputs)` equals the commitment in the user's `zkma:proof-commitment` ENS record. (Cheap layer 1.)
+2. The proof's `pubkey_modulus_limbs` matches an RSA modulus Google currently publishes in its JWKS. (Layer 2 - gateway-side pin.)
+3. The Noir circuit verifies cryptographically: signature valid for that modulus, `email` claim matches `expected_email`, `email_verified` is true, `aud` matches `expected_aud`, `iat` is in the freshness window. (Layer 3 - bb.js.)
+4. The user signed a per-request ECDSA challenge that recovers to the wallet address bound to their ENS subname. (Layer 4 - challenge in the gateway.)
+
+Any single layer fails -> 401/403. Documented in `circuits/README.md` "Defenses outside the circuit".
+
 ## Known gaps
 
 - **Browser proof generation** (`/refresh` page) is not yet wired. The cryptographic core works (proof gen + verify) - what's missing is a UI that takes a Google JWT, runs noir-jwt + bb.js in the browser, and writes the resulting commitment to ENS. Until then, proofs are generated in `apps/gateway/scripts/test-real-proof.ts` and `test-mem0-real.ts` injects a fake `verifyProof` because the test focuses on the search path.
+- **Email is plaintext in publicInputs.** v0.2 should hash it (Poseidon) so observers of the proof see only a commitment, not the email itself. Out of scope for this iteration.
 - **Sepolia contract still has the old prefix.** Source code uses `zkmemory-` and `zkma:*`; deployed contract uses `zkcontext-` and `zkca:*`. Redeploy steps above.
 - **stub-openai's embeddings are deterministic-by-content but content-blind to semantics.** Vector similarity ranks are arbitrary. Fine for showing that metadata filtering works; not fine for testing search-relevance quality.
 

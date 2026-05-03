@@ -4,7 +4,17 @@ Noir circuits for zk-memory-authorization.
 
 ## zkma-auth
 
-Proves the user holds a fresh Google-signed JWT issued to an email the org admin pre-committed to, without revealing the JWT or signature. The output proof (its commitment) is what the user writes into `zkma:proof-commitment` on their ENS subname; the gateway re-verifies it on every memory query.
+Proves the user holds a fresh, audience-pinned, email-verified Google-signed JWT issued to an email the org admin pre-committed to. The output proof's commitment is what the user writes into `zkma:proof-commitment` on their ENS subname; the gateway re-verifies it on every memory query.
+
+### What a valid proof attests to
+
+When the gateway also pins the modulus to Google's published JWKS (it does, by default - see `apps/gateway/src/jwks.ts`):
+
+1. The JWT was signed by an RSA key Google currently publishes.
+2. The JWT's `email` claim equals the public input `expected_email` (the email the org admin set at onboarding).
+3. The JWT's `email_verified` claim is `true` (Google has confirmed inbox ownership).
+4. The JWT's `aud` claim equals the public input `expected_aud` (your OAuth client_id).
+5. The JWT's `iat` is within `[iat_lower, iat_upper]` - bounded freshness.
 
 ### Build
 
@@ -23,19 +33,42 @@ nargo compile        # emits target/zkma_auth.json (~1.4 MB)
 
 | Visibility | Field | Source | Purpose |
 |---|---|---|---|
-| public | `pubkey_modulus_limbs` | Google JWKS at the time of signing | Anchors the verifier to Google's current RSA key |
-| public | `redc_params_limbs` | derived from modulus | Modular reduction parameters |
-| public | `expected_email` | onboarding flow | Binds the proof to one specific email; admin commits to this in advance |
-| public | `iat_lower` / `iat_upper` | gateway clock | Freshness window so old JWTs are rejected |
-| private | `data` | user's signed JWT | The base64 `header.payload` bytes |
-| private | `base64_decode_offset` | derived from JWT | Where to start base64 decoding inside `data` |
+| public | `pubkey_modulus_limbs` | Google JWKS at the time of signing | RSA modulus the JWT was signed with; gateway pins this to Google |
+| public | `redc_params_limbs` | derived from modulus | Modular reduction parameters for the bignum lib |
+| public | `expected_email` | onboarding flow | Binds the proof to one specific email |
+| public | `expected_aud` | onboarding flow | Pins the JWT to a specific OAuth client_id (anti-replay across apps) |
+| public | `iat_lower` / `iat_upper` | gateway clock | Freshness window |
+| private | `data` | user's signed JWT | base64 `header.payload` bytes |
+| private | `base64_decode_offset` | derived from JWT | base64 decode start within `data` |
 | private | `signature_limbs` | user's signed JWT | RSA-2048 signature limbs |
 
-The JWT itself never leaves the user's browser. The admin only knows the email hash (because they typed it during onboarding); the gateway only sees the proof, the public inputs, and the ENS-anchored commitment.
+The JWT itself never leaves the user's browser. The admin only knows the email (because they typed it during onboarding); the gateway only sees the proof and its public inputs.
 
-### What's missing (TODO before demo)
+### Public input layout (matters for the gateway's JWKS check)
 
-- Public-input layout decisions: do we expose `iat` itself, or just the window? Bigger window = more privacy, smaller window = stronger replay defense.
-- Selective email-domain disclosure (e.g. prove `*@hospital.org`, hide local part). Today we bind to the full email hash. Domain-only would need an in-circuit `@` split + sub-hash.
-- A canonical commitment scheme tying `(proof || public_inputs)` to the bytes32 written on ENS - currently the gateway is expected to do this hashing in TS.
-- A separate `zkma-roles` circuit if we ever want roles to come from the JWT itself rather than a side-channel admin assertion.
+Order in main.nr's signature determines the order of fields in `proofData.publicInputs`:
+
+| Indices | Field | Notes |
+|---|---|---|
+| 0..17 | `pubkey_modulus_limbs[18]` | gateway compares each limb against Google JWKS |
+| 18..35 | `redc_params_limbs[18]` | informational |
+| 36..136 | `expected_email` | 100 bytes storage + length |
+| 137..266 | `expected_aud` | 128 bytes storage + length |
+| 267 | `iat_lower` | u64 |
+| 268 | `iat_upper` | u64 |
+
+If you reorder parameters in `main.nr`, update `LIMB_COUNT` / `modulusFromPublicInputs` in `apps/gateway/src/jwks.ts`.
+
+### Defenses outside the circuit
+
+The circuit does **not** prove:
+
+- That the modulus is Google's. The gateway must check this against `https://www.googleapis.com/oauth2/v3/certs`. See `apps/gateway/src/jwks.ts`.
+- That the user owns the wallet bound to their ENS subname. The gateway checks a per-request ECDSA signature against the subname's `addr` resolver record.
+- That the proof commitment matches what the user wrote on ENS. The gateway checks `keccak256(proof || publicInputs)` against `zkma:proof-commitment`.
+
+### Known limitations / future work
+
+- **Email is in the public inputs as plaintext bytes.** v0.2 should switch to a Poseidon hash so observers see only `expected_email_hash`.
+- **No selective-disclosure mode.** "I have any `*@hospital.org` Google account" requires in-circuit `@`-splitting; deferred.
+- **Brillig soundness warnings** from noir-jwt's transitive deps (sha256, noir-bignum, noir_string_search). Upstream concern, not introduced by zkma.
