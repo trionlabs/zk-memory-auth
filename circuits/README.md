@@ -8,15 +8,16 @@ Proves the user holds a fresh Google-signed JWT issued to an email the org admin
 
 ### Build
 
-Requires nargo >= 1.0.0 (Noir compiler with bn254 backend) and bb >= 0.50 for proof generation.
+Requires `nargo 1.0.0-beta.15` exactly. Newer nargo (>= beta.16) removed `std::wrapping_add`, which `sha512 v0.1.0` (transitively pulled by noir-jwt v0.5.1 -> noir_rsa v0.9.1) still calls. Until noir-jwt bumps to noir_rsa v0.10.0 + sha512 v0.1.1, we stay on beta.15.
 
 ```bash
+noirup -v 1.0.0-beta.15
 cd circuits/zkma-auth
 nargo check
-nargo compile
+nargo compile        # emits target/zkma_auth.json (~1.4 MB)
 ```
 
-> **Known upstream blocker (2026-05-03):** noir-jwt v0.5.1 pins `noir_rsa v0.9.1`, which transitively pins `sha512 v0.1.0`. That sha512 release uses `std::wrapping_add`, removed in nargo 1.0.0-beta.16+. `sha512 v0.1.1` fixed it (method-style `.wrapping_add`), and `noir_rsa v0.10.0` adopts that, but noir-jwt has not bumped yet. Workarounds until upstream catches up: (a) build with nargo <= 1.0.0-beta.15, or (b) vendor a local fork of noir-jwt with the deps bumped. The Nargo.toml here pins v0.5.1 deliberately - we want to track upstream, not fork.
+`nargo compile` prints brillig-soundness advisories from noir-jwt's upstream deps (sha256, noir-bignum). They are warnings, not errors - exit 0, artifact written. Track upstream noir-jwt for the fix.
 
 ### Public vs private inputs
 
