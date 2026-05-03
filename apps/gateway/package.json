@@ -9,7 +9,9 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test:proof": "tsx scripts/test-real-proof.ts",
-    "test:http": "tsx scripts/test-http-flow.ts"
+    "test:http": "tsx scripts/test-http-flow.ts",
+    "test:mem0": "tsx scripts/test-mem0-real.ts",
+    "stub:openai": "tsx scripts/stub-openai.ts"
   },
   "dependencies": {
     "@aztec/bb.js": "3.0.0-nightly.20251104",
