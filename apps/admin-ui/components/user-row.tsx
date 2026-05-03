@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { sepoliaDeployment, ZkmaResolverAbi } from "@zkma/contracts-types";
-import type { Abi } from "viem";
+import { keccak256, toBytes, type Abi } from "viem";
 import { fmtExpiry, labelHash, shortAddr } from "@/lib/utils";
 import { TxButton } from "./tx-button";
 
@@ -27,9 +27,19 @@ export function UserRow({ orgNode, orgAdmin, userLabel, ensName }: UserRowProps)
     args: [orgNode, labelHash(userLabel)],
   });
 
-  // returns [userAddr, role, namespaces, maxTag, expiry, revoked, exists, proofCommitment]
+  // returns [userAddr, role, namespaces, maxTag, expiry, revoked, exists, proofCommitment, emailHash]
   const data = userQuery.data as
-    | readonly [`0x${string}`, string, string, string, bigint, boolean, boolean, `0x${string}`]
+    | readonly [
+        `0x${string}`,
+        string,
+        string,
+        string,
+        bigint,
+        boolean,
+        boolean,
+        `0x${string}`,
+        `0x${string}`,
+      ]
     | undefined;
 
   const [edit, setEdit] = useState(false);
@@ -51,7 +61,7 @@ export function UserRow({ orgNode, orgAdmin, userLabel, ensName }: UserRowProps)
   // and they shouldn't see the roster anyway.
   if (!data || !data[6]) return null;
 
-  const [userAddr, currentRole, currentNs, currentMaxTag, currentExpiry, revoked, , commit] = data;
+  const [userAddr, currentRole, currentNs, currentMaxTag, currentExpiry, revoked, , commit, emailHash] = data;
   const isUser = !!connected && connected.toLowerCase() === userAddr.toLowerCase();
 
   // Gate: only render the row when the connected wallet is allowed to see / act on it.
@@ -115,6 +125,12 @@ export function UserRow({ orgNode, orgAdmin, userLabel, ensName }: UserRowProps)
           <dd>{currentMaxTag}</dd>
           <dt className="text-zinc-500">expiry</dt>
           <dd>{fmtExpiry(currentExpiry)}</dd>
+          <dt className="text-zinc-500">email-hash</dt>
+          <dd className="truncate" title={emailHash}>
+            {emailHash === "0x0000000000000000000000000000000000000000000000000000000000000000"
+              ? "— (not set)"
+              : `${emailHash.slice(0, 14)}…`}
+          </dd>
           <dt className="text-zinc-500">commitment</dt>
           <dd className="truncate" title={commit}>{commit === "0x0000000000000000000000000000000000000000000000000000000000000000" ? "— (no proof yet)" : `${commit.slice(0, 14)}…`}</dd>
         </dl>
@@ -155,6 +171,17 @@ export function UserRow({ orgNode, orgAdmin, userLabel, ensName }: UserRowProps)
         </div>
       )}
 
+      {isAdmin && !revoked && !edit && (
+        <div className="mt-3 pt-3 border-t border-zinc-800">
+          <RotateEmailHashInline
+            orgNode={orgNode}
+            userLabel={userLabel}
+            current={emailHash}
+            onConfirmed={() => userQuery.refetch()}
+          />
+        </div>
+      )}
+
       {isUser && (
         <div className="mt-3 pt-3 border-t border-zinc-800">
           <ProofCommitmentInline
@@ -165,6 +192,54 @@ export function UserRow({ orgNode, orgAdmin, userLabel, ensName }: UserRowProps)
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function RotateEmailHashInline({
+  orgNode,
+  userLabel,
+  current,
+  onConfirmed,
+}: {
+  orgNode: `0x${string}`;
+  userLabel: string;
+  current: `0x${string}`;
+  onConfirmed: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const trimmed = email.trim().toLowerCase();
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+  const newHash = ok
+    ? (keccak256(toBytes(trimmed)) as `0x${string}`)
+    : ("0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`);
+  const sameAsCurrent = ok && newHash.toLowerCase() === current.toLowerCase();
+  const disableReason = !ok
+    ? "type a valid email"
+    : sameAsCurrent
+      ? "no change"
+      : null;
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-zinc-500 font-mono w-28">rotate email</span>
+      <input
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="new@hospital.org"
+        className="flex-1 bg-zinc-950 border border-zinc-700 rounded px-2 py-1 font-mono text-[11px]"
+      />
+      <TxButton
+        functionName="setEmailHash"
+        args={[orgNode, userLabel, newHash]}
+        label="Rotate"
+        className="bg-amber-500 text-zinc-950 hover:bg-amber-400 px-3 py-1 text-xs"
+        disabledReason={disableReason}
+        onConfirmed={() => {
+          setEmail("");
+          onConfirmed();
+        }}
+      />
     </div>
   );
 }
