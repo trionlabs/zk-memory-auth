@@ -3,12 +3,12 @@
     <div>
       <p class="section-kicker">01 / Problem</p>
       <h2 class="section-title">Memory access is still a database filter.</h2>
+      <p class="section-pullquote">
+        Trust the operator, or verify the proof. Pick one.
+      </p>
       <p class="section-copy">
-        If two agents query the same memory store today, they usually get
-        whatever the operator&apos;s application code returns. That works for
-        toy assistants. It fails in hospitals, finance desks, law firms, and
-        any team where role, namespace, expiry, and revocation need to be
-        independently verifiable.
+        That works for toy assistants. It breaks anywhere role, namespace,
+        expiry, or revocation must be independently verifiable.
       </p>
     </div>
 

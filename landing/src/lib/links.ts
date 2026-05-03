@@ -21,43 +21,72 @@ export const textRecords = [
   "zkma:partners",
 ] as const;
 
-export const gates = [
+export type KwTone = "ens" | "google" | "noir" | "wallet" | "mem0";
+export type GateSegment = string | { kw: string; tone: KwTone };
+
+export const gates: ReadonlyArray<{ title: string; body: ReadonlyArray<GateSegment> }> = [
   {
-    title: "Commitment match",
-    body: "The submitted proof is hashed and compared with the proof commitment stored on the user's ENS record.",
+    title: "Match the proof commitment",
+    body: [
+      "The submitted proof is hashed and compared with the commitment on the user's ",
+      { kw: "ENS", tone: "ens" },
+      " record.",
+    ],
   },
   {
-    title: "Pinned Google key",
-    body: "The gateway rejects proofs unless the JWT key material matches the pinned Google JWKS modulus.",
+    title: "Pin Google's signing key",
+    body: [
+      "The gateway rejects proofs unless the ",
+      { kw: "JWT", tone: "google" },
+      " key matches the pinned ",
+      { kw: "Google", tone: "google" },
+      " ",
+      { kw: "JWKS", tone: "google" },
+      " modulus.",
+    ],
   },
   {
-    title: "Barretenberg verify",
-    body: "The Noir proof is verified off-chain with Barretenberg before any mem0 request is built.",
+    title: "Verify with Barretenberg",
+    body: [
+      "The ",
+      { kw: "Noir", tone: "noir" },
+      " proof is verified off-chain with ",
+      { kw: "Barretenberg", tone: "noir" },
+      " before any ",
+      { kw: "mem0", tone: "mem0" },
+      " request is built.",
+    ],
   },
   {
-    title: "Nonce wallet signature",
-    body: "Every request carries a wallet signature over a fresh nonce, bound to the subname's addr record.",
+    title: "Bind to a fresh nonce",
+    body: [
+      "Every request carries a ",
+      { kw: "wallet", tone: "wallet" },
+      " signature over a fresh nonce, bound to the subname's ",
+      { kw: "addr", tone: "ens" },
+      " record.",
+    ],
   },
-] as const;
+];
 
 export const personas = [
   {
     role: "Nurse",
-    ens: "aysel.zkmemory-istanbulhospital.eth",
-    namespaces: "clinical, operational",
+    ens: "nurse.zkmemory-hospital.eth",
+    namespaces: "clinical",
     maxTag: "confidential",
     results: ["allow", "deny", "deny"],
   },
   {
     role: "Resident",
-    ens: "mert.zkmemory-istanbulhospital.eth",
-    namespaces: "clinical, research",
+    ens: "resident.zkmemory-hospital.eth",
+    namespaces: "clinical",
     maxTag: "confidential",
     results: ["allow", "deny", "deny"],
   },
   {
-    role: "Admin",
-    ens: "dr-yildiz.zkmemory-istanbulhospital.eth",
+    role: "Hospital admin",
+    ens: "admin.zkmemory-hospital.eth",
     namespaces: "all",
     maxTag: "restricted",
     results: ["allow", "allow", "allow"],

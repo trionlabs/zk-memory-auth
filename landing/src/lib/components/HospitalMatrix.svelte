@@ -10,8 +10,8 @@
         <h2 class="section-title">Same hospital memory. Different answers.</h2>
       </div>
       <p class="section-note">
-        Every row is an ENS subname. Every decision is derived from text
-        records and the proof attached to the request.
+        Every row is an ENS subname. Every decision comes from on-chain
+        records — not application code.
       </p>
     </div>
 
@@ -46,18 +46,6 @@
           {/each}
         </tbody>
       </table>
-    </div>
-
-    <div class="partner-band">
-      <div>
-        <span class="mini-label">cross-org case</span>
-        <strong>claims-bot.zkmemory-acmeinsurance.eth</strong>
-      </div>
-      <p>
-        Billing codes shared with the insurer pass. Mental health history and
-        hospital strategy fail because namespace, tag level, and partner
-        records do not match.
-      </p>
     </div>
   </div>
 </section>

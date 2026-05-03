@@ -59,16 +59,12 @@ button {
 }
 
 .brand-mark {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .topbar {
@@ -554,6 +550,24 @@ button {
   max-width: 620px;
 }
 
+.section-pullquote {
+  margin: var(--s6) 0 0;
+  max-width: 28ch;
+  color: var(--fg-0);
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 2.4vw, 1.85rem);
+  font-weight: 500;
+  line-height: 1.18;
+  letter-spacing: -0.005em;
+  border-left: 3px solid var(--accent);
+  padding-left: var(--s5);
+}
+
+.section-pullquote-after {
+  margin-top: var(--s10);
+  max-width: 50ch;
+}
+
 .section-note {
   max-width: 410px;
   font-size: var(--text-sm);
@@ -782,26 +796,100 @@ button {
   gap: var(--s4);
 }
 
-.gate-card,
+.gate-grid {
+  position: relative;
+  margin-top: var(--s10);
+  padding-top: 8px;
+}
+
+/* Dashed chain connecting the 4 floating step badges. Sits behind cards
+ * (the cards' own background hides the line beneath them, so only the gaps
+ * between cards show the dashes — visual hint of "pipeline of four"). */
+.gate-grid::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: calc(var(--s5) + 16px);
+  right: calc(var(--s5) + 16px);
+  height: 2px;
+  background-image: linear-gradient(
+    to right,
+    var(--border-2) 0,
+    var(--border-2) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+  background-size: 10px 2px;
+  background-repeat: repeat-x;
+  z-index: 0;
+  pointer-events: none;
+}
+
 .ens-point {
   border: 1px solid var(--border-1);
   border-radius: var(--radius-lg);
   background: var(--bg-1);
   padding: var(--s5);
-  min-height: 210px;
+  min-height: 150px;
 }
 
-.gate-num {
+.gate-card {
+  position: relative;
+  z-index: 1;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-lg);
+  background: var(--bg-1);
+  padding: var(--s8) var(--s5) var(--s5);
+  min-height: 230px;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.gate-card:hover {
+  border-color: var(--border-2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.gate-step {
+  position: absolute;
+  top: -14px;
+  left: var(--s5);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-0);
+  border: 1px solid var(--border-2);
+  color: var(--fg-0);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  box-shadow: var(--shadow-xs);
+}
+
+.gate-step-label {
+  display: block;
+  margin-bottom: var(--s2);
   color: var(--fg-4);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding-left: 38px;
 }
 
 .gate-card h3 {
-  margin: var(--s6) 0 var(--s3);
+  margin: 0 0 var(--s3);
   color: var(--fg-0);
   font-size: var(--text-lg);
   font-weight: 700;
+  letter-spacing: -0.005em;
 }
 
 .gate-card p,
@@ -809,6 +897,56 @@ button {
   margin: 0;
   color: var(--fg-2);
   line-height: var(--leading-relaxed);
+}
+
+/* Inline tech keyword pills — Geist mono, low-saturation tints from the
+ * token palette so they read as semantic chips, not decoration. */
+.kw {
+  display: inline-block;
+  padding: 1px 7px;
+  margin: 0 1px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+  letter-spacing: -0.005em;
+  color: var(--fg-0);
+  vertical-align: baseline;
+  transform: translateY(-0.5px);
+}
+
+.kw-ens {
+  background: color-mix(in srgb, var(--billing) 11%, var(--bg-0));
+  border-color: color-mix(in srgb, var(--billing) 38%, transparent);
+  color: color-mix(in srgb, var(--billing) 55%, var(--fg-0));
+}
+
+.kw-google {
+  background: color-mix(in srgb, var(--info) 10%, var(--bg-0));
+  border-color: color-mix(in srgb, var(--info) 38%, transparent);
+  color: color-mix(in srgb, var(--info) 55%, var(--fg-0));
+}
+
+.kw-noir {
+  background: color-mix(in srgb, var(--proof) 12%, var(--bg-0));
+  border-color: color-mix(in srgb, var(--proof) 40%, transparent);
+  color: color-mix(in srgb, var(--proof) 50%, var(--fg-0));
+}
+
+.kw-mem0 {
+  background: color-mix(in srgb, var(--clinical) 10%, var(--bg-0));
+  border-color: color-mix(in srgb, var(--clinical) 38%, transparent);
+  color: color-mix(in srgb, var(--clinical) 55%, var(--fg-0));
+}
+
+.kw-wallet {
+  background: var(--accent-bg);
+  border-color: var(--border-2);
+  color: var(--fg-0);
 }
 
 .fact-list {
@@ -880,8 +1018,8 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.ens-point {
-  min-height: 150px;
+.ens-point-grid-single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .point-mark {
@@ -917,8 +1055,6 @@ button {
 }
 
 .footer-mark {
-  background: var(--accent-fg);
-  color: var(--fg-0);
   grid-row: span 2;
 }
 

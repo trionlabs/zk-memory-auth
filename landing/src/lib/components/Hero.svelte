@@ -7,7 +7,7 @@
 <header class="site-hero" id="top">
   <nav class="topbar" aria-label="Primary">
     <a href="#top" class="brand-lockup" aria-label="zk memory auth home">
-      <span class="brand-mark" aria-hidden="true">Z</span>
+      <span class="brand-mark" aria-hidden="true">🧩</span>
       <span>
         <span class="brand-name">zk memory auth</span>
       </span>
@@ -43,9 +43,8 @@
         same store.
       </p>
       <p class="hero-body">
-        A drop-in gateway in front of mem0 that checks a Google-derived Noir
-        proof, resolves the user&apos;s ENS subname, reads role policy from
-        ZkmaResolver, and filters memory before retrieval.
+        A stateless gateway in front of mem0. Noir proof verifies who you
+        are, ENS records say what you can read.
       </p>
       <div class="hero-actions" aria-label="Project links">
         <a
