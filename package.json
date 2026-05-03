@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter @zkma/admin-ui dev",
-    "build": "pnpm --filter @zkma/admin-ui build"
+    "build": "pnpm --filter @zkma/admin-ui build",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck"
   },
   "packageManager": "pnpm@9.0.0"
 }
