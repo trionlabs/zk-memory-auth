@@ -1,27 +1,67 @@
 import { keccak256, toBytes } from "viem";
+import { readFileSync } from "node:fs";
+import { Barretenberg, UltraHonkBackend } from "@aztec/bb.js";
 import { env } from "./env.js";
 
 /**
- * Verify a Noir proof against the user's ENS-anchored commitment.
+ * Lazy-init the bb.js backend on first verify. CRS download + backend init takes
+ * a few seconds, and we'd rather pay that cost when the first request lands than
+ * at startup (so /healthz comes up immediately).
+ */
+let backendPromise: Promise<UltraHonkBackend> | null = null;
+
+async function getBackend(): Promise<UltraHonkBackend> {
+  if (backendPromise) return backendPromise;
+  backendPromise = (async () => {
+    const artifact = JSON.parse(
+      readFileSync(env.circuitArtifactPath, "utf8"),
+    ) as { bytecode: string };
+    if (typeof artifact.bytecode !== "string") {
+      throw new Error(
+        `circuit artifact at ${env.circuitArtifactPath} missing bytecode field`,
+      );
+    }
+    const api = await Barretenberg.new();
+    return new UltraHonkBackend(artifact.bytecode, api);
+  })();
+  return backendPromise;
+}
+
+/**
+ * Public inputs come over the wire as a single hex blob (32-byte chunks
+ * concatenated). bb.js wants a string[] of 0x-prefixed field values.
+ */
+function hexToFieldStrings(hex: `0x${string}`): string[] {
+  const buf = Buffer.from(hex.replace(/^0x/, ""), "hex");
+  if (buf.length % 32 !== 0) {
+    throw new Error(`publicInputs length ${buf.length} not a multiple of 32`);
+  }
+  const out: string[] = [];
+  for (let i = 0; i < buf.length; i += 32) {
+    out.push("0x" + buf.subarray(i, i + 32).toString("hex"));
+  }
+  return out;
+}
+
+/**
+ * Verify a Noir UltraHonk proof against the user's ENS-anchored commitment.
  *
- * v0.1: stub. Hashes (proof || publicInputs) and asserts it matches the
- * 32-byte commitment from `zkma:proof-commitment`. The actual Noir verifier
- * call (Barretenberg WASM via @aztec/bb.js) lands once the circuit's
- * verification key is exported - tracked in circuits/zkma-auth/README.md.
+ * Two layers:
+ *   1. (cheap) keccak256(proof || publicInputs) must equal the commitment
+ *      written to `zkma:proof-commitment` on the user's ENS subname. This
+ *      catches a wholesale proof swap before we pay for the backend call.
+ *   2. (real) bb.js UltraHonkBackend.verifyProof against the circuit's
+ *      verification key (derived from the compiled bytecode).
  *
- * In skip mode (ZKMA_SKIP_PROOF_VERIFY=1), accepts any non-empty proof.
- * Demo only - flagged in logs every request so we never miss it on prod.
+ * In skip mode (ZKMA_SKIP_PROOF_VERIFY=1) only layer 1 runs. Logged at startup.
  */
 export async function verifyProof(args: {
   proof: `0x${string}`;
   publicInputs: `0x${string}`;
   expectedCommitment: `0x${string}`;
 }): Promise<{ ok: true } | { ok: false; reason: string }> {
-  if (env.skipProofVerify) {
-    if (!args.proof || args.proof === "0x") {
-      return { ok: false, reason: "skip mode but proof empty" };
-    }
-    return { ok: true };
+  if (!args.proof || args.proof === "0x") {
+    return { ok: false, reason: "proof empty" };
   }
 
   const candidate = keccak256(
@@ -31,6 +71,20 @@ export async function verifyProof(args: {
     return { ok: false, reason: "proof commitment mismatch" };
   }
 
-  // TODO: call bb.js verify(vk, proof, publicInputs) and gate on its result.
+  if (env.skipProofVerify) return { ok: true };
+
+  let publicInputFields: string[];
+  try {
+    publicInputFields = hexToFieldStrings(args.publicInputs);
+  } catch (e) {
+    return { ok: false, reason: (e as Error).message };
+  }
+
+  const backend = await getBackend();
+  const valid = await backend.verifyProof({
+    proof: toBytes(args.proof),
+    publicInputs: publicInputFields,
+  });
+  if (!valid) return { ok: false, reason: "proof failed bb.js verification" };
   return { ok: true };
 }

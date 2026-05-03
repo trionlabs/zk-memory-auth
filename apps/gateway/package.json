@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aztec/bb.js": "^4.2.0",
     "@zkma/contracts-types": "workspace:*",
     "@zkma/policy": "workspace:*",
     "fastify": "^5.0.0",

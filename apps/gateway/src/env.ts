@@ -13,6 +13,11 @@ export const env = {
   mem0ApiKey: process.env.MEM0_API_KEY ?? "",
   /** When true, accept the proof header as-is without verifying. Demo only. */
   skipProofVerify: process.env.ZKMA_SKIP_PROOF_VERIFY === "1",
+  /** Path to the nargo-compiled circuit json (target/zkma_auth.json). */
+  circuitArtifactPath:
+    process.env.ZKMA_CIRCUIT_PATH ??
+    new URL("../../../circuits/zkma-auth/target/zkma_auth.json", import.meta.url)
+      .pathname,
 } as const;
 
 export { required };
