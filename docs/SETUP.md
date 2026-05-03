@@ -143,7 +143,7 @@ Then drive the gateway from any client. Without browser proof gen wired up yet (
 
 ## Smart contracts
 
-The `ZkmaResolver` source already targets the `zkmemory-` prefix and `zkma:*` text records, but the live Sepolia deployment at `0x418D97d0bA1BF82B79e51C0C1c36FB7105E821DE` still carries the **old** prefix and key namespace from before the rename. To redeploy:
+Live `ZkmaResolver` is deployed at `0x842719526d0265f169a066DE6Dd4451b31141043` on Sepolia (block 10781677). Source and bytecode match: `zkmemory-` prefix, `zkma:*` text records, `emailHash` field with admin-rotatable `setEmailHash`. To redeploy (e.g. after another contract change):
 
 ```bash
 cd contracts

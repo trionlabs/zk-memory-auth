@@ -20,7 +20,7 @@ ens.md                    The ENS architecture in one page - start here
 
 | | |
 |---|---|
-| ZkmaResolver | [`0x418D97d0bA1BF82B79e51C0C1c36FB7105E821DE`](https://sepolia.etherscan.io/address/0x418D97d0bA1BF82B79e51C0C1c36FB7105E821DE) |
+| ZkmaResolver | [`0x842719526d0265f169a066DE6Dd4451b31141043`](https://sepolia.etherscan.io/address/0x842719526d0265f169a066DE6Dd4451b31141043) |
 | Required prefix | `zkmemory-` |
 | Network | Sepolia (chainId 11155111) |
 | RPC (public, no log limits) | `https://ethereum-sepolia-rpc.publicnode.com` |

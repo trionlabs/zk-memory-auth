@@ -82,9 +82,9 @@ Lines 1-19, 26, 43, 89-106 describe a v1 platform-parent-name model (`zkmemoryau
 
 Calls bb.js verification a TODO; it is implemented and tested. Layout section omits `src/jwks.ts`, `src/claims.ts`, `src/server.ts`. `MEM0_AGENT_ID`, `ZKMA_EXPECTED_AUD`, `ZKMA_EXPECTED_ISS`, `ZKMA_IAT_MAX_AGE_SECS`, `ZKMA_GATEWAY_DOMAIN` env vars unmentioned even though setting them wrong returns silent 401/403 to every search request.
 
-### 13. Live Sepolia deployment ≠ source code
+### 13. ~~Live Sepolia deployment ≠ source code~~ FIXED 2026-05-03
 
-`contracts/deployments/sepolia.json` claims `requiredPrefix: "zkmemory-"` but the bytecode at the listed address still has the pre-rename `zkcontext-` prefix. The admin UI points at this address and will revert with prefix-mismatch on `registerOrg`. Documented in `docs/SETUP.md` "Smart contracts" section but the JSON itself carries no warning.
+Redeployed at `0x842719526d0265f169a066DE6Dd4451b31141043` (block 10781677). Source and bytecode now match: `zkmemory-` prefix, `zkma:*` text records, `emailHash` field. Smoke test passes.
 
 ### 14. `contracts/README.md` and `packages/contracts-types/src/index.ts` disagree on `zkma:org` vs `zkma:version`
 

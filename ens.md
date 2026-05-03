@@ -68,7 +68,7 @@ User subnames are minted as **real wrapped ERC-1155 tokens** (so they appear in 
 | | Value |
 |---|---|
 | Chain | Sepolia (chainId 11155111) |
-| Resolver | `0x418D97d0bA1BF82B79e51C0C1c36FB7105E821DE` |
+| Resolver | `0x842719526d0265f169a066DE6Dd4451b31141043` |
 | Required prefix | `zkmemory-` |
 | ENS Registry | `0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e` |
 | NameWrapper | `0x0635513f179D50A207757E05759CbD106d7dFcE8` |
