@@ -6,7 +6,8 @@
     "dev": "pnpm --filter @zkma/admin-ui dev",
     "build": "pnpm --filter @zkma/admin-ui build",
     "test": "pnpm -r --if-present test",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "seed:memories": "pnpm --filter @zkma/gateway exec tsx ../../scripts/seed-memories.ts"
   },
   "packageManager": "pnpm@9.0.0"
 }
