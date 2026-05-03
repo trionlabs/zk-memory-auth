@@ -19,6 +19,8 @@ export type ResolvedPrincipal = {
   walletAddress: `0x${string}`;
   /** From `zkma:proof-commitment`; the gateway compares against the submitted proof. */
   proofCommitment: `0x${string}` | null;
+  /** From `zkma:email-hash`; keccak256 of the email the org admin onboarded. */
+  emailHash: `0x${string}` | null;
   /** From `zkma:expiry`; if past, principal is dead. */
   expiry: number;
   /** From `zkma:revoked`. */
@@ -47,6 +49,7 @@ export async function resolvePrincipal(
     expiryRaw,
     revokedRaw,
     proofCommitmentRaw,
+    emailHashRaw,
   ] = await Promise.all([
     client.getEnsAddress({ name: ensName }),
     client.getEnsText({ name: ensName, key: "zkma:role" }),
@@ -55,6 +58,7 @@ export async function resolvePrincipal(
     client.getEnsText({ name: ensName, key: "zkma:expiry" }),
     client.getEnsText({ name: ensName, key: "zkma:revoked" }),
     client.getEnsText({ name: ensName, key: "zkma:proof-commitment" }),
+    client.getEnsText({ name: ensName, key: "zkma:email-hash" }),
   ]);
 
   if (!walletAddress || !role || !maxTagRaw) return null;
@@ -74,6 +78,10 @@ export async function resolvePrincipal(
     proofCommitmentRaw && /^0x[0-9a-fA-F]{64}$/.test(proofCommitmentRaw)
       ? (proofCommitmentRaw as `0x${string}`)
       : null;
+  const emailHash =
+    emailHashRaw && /^0x[0-9a-fA-F]{64}$/.test(emailHashRaw)
+      ? (emailHashRaw as `0x${string}`)
+      : null;
 
-  return { principal, walletAddress, proofCommitment, expiry, revoked };
+  return { principal, walletAddress, proofCommitment, emailHash, expiry, revoked };
 }

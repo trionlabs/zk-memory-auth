@@ -17,7 +17,7 @@ import crypto from "node:crypto";
 import jsonwebtoken from "jsonwebtoken";
 import { Noir } from "@noir-lang/noir_js";
 import { UltraHonkBackend } from "@aztec/bb.js";
-import { keccak256 } from "viem";
+import { keccak256, toBytes } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { buildServer } from "../src/server.js";
 import type { ResolvedPrincipal } from "../src/ens.js";
@@ -186,6 +186,7 @@ async function main(): Promise<void> {
     expiry?: number;
     walletAddress?: `0x${string}`;
     proofCommitment?: `0x${string}` | null;
+    emailHash?: `0x${string}` | null;
     namespaces?: readonly string[];
   };
   function makeServer(opts: FakeOpts = {}) {
@@ -203,6 +204,10 @@ async function main(): Promise<void> {
           },
           walletAddress: opts.walletAddress ?? wallet.address,
           proofCommitment: opts.proofCommitment === undefined ? commitment : opts.proofCommitment,
+          emailHash:
+            opts.emailHash === undefined
+              ? (keccak256(toBytes(EMAIL.toLowerCase())) as `0x${string}`)
+              : opts.emailHash,
           expiry: opts.expiry ?? 1799999999,
           revoked: opts.revoked ?? false,
         };

@@ -7,7 +7,7 @@ import {
   modulusFromPublicInputs,
   moduliMatch,
 } from "./jwks.js";
-import { checkClaims } from "./claims.js";
+import { checkClaims, checkEmailBinding } from "./claims.js";
 
 /**
  * Lazy-init the bb.js backend on first verify. CRS download + backend init takes
@@ -64,6 +64,10 @@ export async function verifyProof(args: {
   proof: `0x${string}`;
   publicInputs: `0x${string}`;
   expectedCommitment: `0x${string}`;
+  /** keccak256(email) the org admin onboarded; from `zkma:email-hash`.
+   *  Required - without it the gateway cannot bind a JWT to the admin's
+   *  intended user. */
+  expectedEmailHash: `0x${string}` | null;
 }): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!args.proof || args.proof === "0x") {
     return { ok: false, reason: "proof empty" };
@@ -108,6 +112,17 @@ export async function verifyProof(args: {
     return { ok: false, reason: `claims check failed: ${(e as Error).message}` };
   }
   if (!claims.ok) return { ok: false, reason: claims.reason };
+
+  // Email binding: the JWT's email claim must hash to the value the org
+  // admin onboarded for this subname. Closes the "shadow identity" gap
+  // where a user with any Google JWT could prove against their subname.
+  let emailBinding;
+  try {
+    emailBinding = checkEmailBinding(publicInputFields, args.expectedEmailHash);
+  } catch (e) {
+    return { ok: false, reason: `email binding failed: ${(e as Error).message}` };
+  }
+  if (!emailBinding.ok) return { ok: false, reason: emailBinding.reason };
 
   // Skip the bb.js cryptographic call only when explicitly requested. The
   // start-up warning in index.ts logs this state. JWKS + claim pins above

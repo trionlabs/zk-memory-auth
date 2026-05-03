@@ -46,9 +46,16 @@ export const env = {
     return Number(process.env.ZKMA_IAT_MAX_AGE_SECS ?? 7 * 24 * 3600);
   },
   /** Domain separator mixed into the per-request signed challenge so a
-   *  signature for one deployment cannot be replayed against another. */
+   *  signature for one deployment cannot be replayed against another.
+   *  Throws if explicitly set to empty - empty would yield a constant
+   *  domainHash and provide no separation. */
   get gatewayDomain(): string {
-    return process.env.ZKMA_GATEWAY_DOMAIN ?? "zkma:gateway:dev";
+    const v = process.env.ZKMA_GATEWAY_DOMAIN;
+    if (v === undefined) return "zkma:gateway:dev";
+    if (v.trim().length === 0) {
+      throw new Error("ZKMA_GATEWAY_DOMAIN is set but empty - choose a non-empty value");
+    }
+    return v;
   },
   /** When true, accept the proof header as-is without verifying. Demo only. */
   get skipProofVerify(): boolean {

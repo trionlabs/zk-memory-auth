@@ -123,6 +123,7 @@ function makeServerForPrincipal(principal: Principal) {
       principal,
       walletAddress: wallet.address,
       proofCommitment: "0x" + "ab".repeat(32) as `0x${string}`,
+      emailHash: "0x" + "cd".repeat(32) as `0x${string}`,
       expiry: 1799999999,
       revoked: false,
     }),

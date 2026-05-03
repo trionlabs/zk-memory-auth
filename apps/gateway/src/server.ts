@@ -97,6 +97,7 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
       proof: body.proof,
       publicInputs: body.publicInputs,
       expectedCommitment: resolved.proofCommitment,
+      expectedEmailHash: resolved.emailHash,
     });
     if (!proofCheck.ok) return { ok: false, status: 403, error: proofCheck.reason };
 

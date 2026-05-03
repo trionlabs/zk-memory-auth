@@ -8,6 +8,7 @@
  * order. If you reorder parameters there, update the offsets here.
  */
 
+import { keccak256, toBytes } from "viem";
 import { env } from "./env.js";
 
 // Layout: see circuits/zkma-auth/src/main.nr.
@@ -116,6 +117,9 @@ export function checkClaims(publicInputs: string[]): ClaimsCheckResult {
     return { ok: false, reason: `iss mismatch: ${iss}` };
   }
 
+  // (Email-binding lives in checkEmailBinding because it depends on a value
+  // resolved from ENS, not env.)
+
   const iatLower = fieldToBigInt(publicInputs[IAT_LOWER_OFFSET]);
   const iatUpper = fieldToBigInt(publicInputs[IAT_UPPER_OFFSET]);
   const now = BigInt(Math.floor(Date.now() / 1000));
@@ -129,6 +133,45 @@ export function checkClaims(publicInputs: string[]): ClaimsCheckResult {
   // Allow a small future skew (60s) for clock drift between client and gateway.
   if (iatUpper > now + 60n) {
     return { ok: false, reason: `iat_upper ${iatUpper} in the future` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Asserts the JWT email the user proved against matches the email hash the
+ * org admin onboarded for this subname. Without this, a user with a valid
+ * Google JWT for any email could prove against their subname using whatever
+ * Google account they want, bypassing the admin's intent.
+ *
+ * Lowercases the email before hashing - the admin UI does the same, and
+ * Google normalizes email case in JWT claims.
+ */
+export function checkEmailBinding(
+  publicInputs: string[],
+  expectedEmailHash: `0x${string}` | null,
+): ClaimsCheckResult {
+  if (!expectedEmailHash) {
+    return {
+      ok: false,
+      reason: "no email-hash on ENS; admin has not onboarded an email yet",
+    };
+  }
+
+  let emailFromProof: string;
+  try {
+    emailFromProof = decodeBoundedVec(
+      publicInputs,
+      EMAIL_STORAGE_OFFSET,
+      MAX_EMAIL_LENGTH,
+      EMAIL_LENGTH_OFFSET,
+    );
+  } catch (e) {
+    return { ok: false, reason: `email decode failed: ${(e as Error).message}` };
+  }
+
+  const computed = keccak256(toBytes(emailFromProof.toLowerCase()));
+  if (computed.toLowerCase() !== expectedEmailHash.toLowerCase()) {
+    return { ok: false, reason: "email hash does not match ENS email-hash record" };
   }
   return { ok: true };
 }

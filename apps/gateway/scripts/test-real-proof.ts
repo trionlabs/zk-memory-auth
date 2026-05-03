@@ -21,7 +21,7 @@ import crypto from "node:crypto";
 import jsonwebtoken from "jsonwebtoken";
 import { Noir } from "@noir-lang/noir_js";
 import { UltraHonkBackend } from "@aztec/bb.js";
-import { keccak256 } from "viem";
+import { keccak256, toBytes } from "viem";
 import { verifyProof } from "../src/proof.js";
 import { __zkmaTestResetJwksCache as resetJwksCache } from "../src/jwks.js";
 
@@ -184,6 +184,8 @@ async function main(): Promise<void> {
   console.log(`      proof bytes: ${proofData.proof.length}, public inputs: ${proofData.publicInputs.length}`);
 
   console.log("[5/5] verify through gateway verifyProof");
+  // Pre-compute the admin's expected email hash (admin onboards this at registerUser).
+  const expectedEmailHash = keccak256(toBytes(EMAIL.toLowerCase())) as `0x${string}`;
   // Wire format: publicInputs as a single concatenated 32-byte hex blob.
   const publicInputsHex = ("0x" +
     proofData.publicInputs
@@ -210,6 +212,7 @@ async function main(): Promise<void> {
     proof: proofHex,
     publicInputs: publicInputsHex,
     expectedCommitment,
+    expectedEmailHash,
   });
 
   if (!result.ok) {
@@ -232,6 +235,7 @@ async function main(): Promise<void> {
     proof: tamperedHex,
     publicInputs: publicInputsHex,
     expectedCommitment: tamperedCommitment, // commitment matches the tampered proof, so layer 1 passes
+    expectedEmailHash,
   });
   if (tamperedResult.ok) {
     console.error("FAIL: gateway accepted a tampered proof");
@@ -245,6 +249,7 @@ async function main(): Promise<void> {
     proof: proofHex,
     publicInputs: publicInputsHex,
     expectedCommitment: wrongCommitment,
+    expectedEmailHash,
   });
   if (wrongResult.ok) {
     console.error("FAIL: gateway accepted a proof with wrong commitment");
@@ -260,6 +265,7 @@ async function main(): Promise<void> {
     proof: proofHex,
     publicInputs: publicInputsHex,
     expectedCommitment,
+    expectedEmailHash,
   });
   if (noJwksResult.ok) {
     console.error("FAIL: gateway accepted a proof not in the JWKS allowlist");
@@ -278,6 +284,7 @@ async function main(): Promise<void> {
     proof: proofHex,
     publicInputs: publicInputsHex,
     expectedCommitment,
+    expectedEmailHash,
   });
   if (audMismatch.ok) {
     console.error("FAIL: gateway accepted a proof with mismatched aud");
@@ -292,6 +299,7 @@ async function main(): Promise<void> {
     proof: proofHex,
     publicInputs: publicInputsHex,
     expectedCommitment,
+    expectedEmailHash,
   });
   if (issMismatch.ok) {
     console.error("FAIL: gateway accepted a proof with mismatched iss");
@@ -306,12 +314,41 @@ async function main(): Promise<void> {
     proof: proofHex,
     publicInputs: publicInputsHex,
     expectedCommitment,
+    expectedEmailHash,
   });
   if (iatStale.ok) {
     console.error("FAIL: gateway accepted a stale-iat proof");
     process.exit(1);
   }
   console.log(`      iat-stale rejection:    ${iatStale.reason}`);
+
+  // Negative case 7: email-hash mismatch - admin onboarded a different email.
+  process.env.ZKMA_IAT_MAX_AGE_SECS = "604800"; // restore default before this case
+  const wrongEmailHash = keccak256(toBytes("someone-else@hospital.org")) as `0x${string}`;
+  const emailMismatch = await verifyProof({
+    proof: proofHex,
+    publicInputs: publicInputsHex,
+    expectedCommitment,
+    expectedEmailHash: wrongEmailHash,
+  });
+  if (emailMismatch.ok) {
+    console.error("FAIL: gateway accepted a proof whose email doesn't match the admin's record");
+    process.exit(1);
+  }
+  console.log(`      email-mismatch rejection: ${emailMismatch.reason}`);
+
+  // Negative case 8: no email hash set on ENS - admin hasn't onboarded yet.
+  const noEmailHash = await verifyProof({
+    proof: proofHex,
+    publicInputs: publicInputsHex,
+    expectedCommitment,
+    expectedEmailHash: null,
+  });
+  if (noEmailHash.ok) {
+    console.error("FAIL: gateway accepted a proof when admin has not onboarded an email");
+    process.exit(1);
+  }
+  console.log(`      no-email-on-ens rejection: ${noEmailHash.reason}`);
 
   console.log("\nPASS - gateway verifies real proofs and rejects every replay vector.");
 }
