@@ -76,13 +76,21 @@ The sig is recovered against the address returned by the subname's `addr` resolv
 
 Write rules (`src/mem0.ts::checkWrite`): tag must be at-or-below the principal's `max-tag`; namespace must be in the principal's namespaces; `owner_org` is forced to the principal's org (no impersonation); `shared_with` is whatever the writer chooses.
 
-## End-to-end real-proof test
+## Tests
 
 ```bash
-cd apps/gateway && pnpm test:proof
+cd apps/gateway
+pnpm test:proof   # bb.js verifier path against a real Noir proof
+pnpm test:http    # HTTP path: fastify.inject with fake ENS + fake mem0
 ```
 
-Signs a JWT with the noir-jwt test key, generates a real UltraHonk proof for the zkma-auth circuit, runs it through `verifyProof`, and exits non-zero if anything is wrong. Also verifies that tampered proofs and wrong commitments are rejected. ~10-15 seconds end-to-end (most of it is proof generation).
+`test:proof` signs a JWT with the noir-jwt test key, generates a real UltraHonk proof for the zkma-auth circuit, runs it through `verifyProof`, and confirms tampered proofs / wrong commitments are rejected. ~10-15 seconds (most of it is proof generation).
+
+`test:http` boots the gateway via `buildServer()` with a fake ENS resolver + fake mem0, then drives it through `fastify.inject`. Real proof, real wallet sig, real keccak. Covers happy path, revoked principal, missing commitment, expired, wrong wallet sig, nonce replay, missing nonce header.
+
+## Architecture for testability
+
+`src/server.ts` exports `buildServer(deps)` - a factory that takes optional injectable deps (`resolvePrincipal`, `searchAndFilter`, `postMemory`, `verifyProof`). Tests pass fakes; `src/index.ts` is a thin entry that uses defaults and calls `.listen()`.
 
 ## Toolchain pins
 
