@@ -2,9 +2,9 @@
   "chainId": 11155111,
   "ensRegistry": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
   "nameWrapper": "0x0635513f179D50A207757E05759CbD106d7dFcE8",
-  "zkmaResolver": "0x418D97d0bA1BF82B79e51C0C1c36FB7105E821DE",
-  "deployBlock": 10774586,
-  "platformAddr": "0x7a30d670ebEb9620E35bC6034AeE69c4Fa5BC50B",
+  "zkmaResolver": "0x842719526d0265f169a066DE6Dd4451b31141043",
+  "deployBlock": 10781677,
+  "platformAddr": "0xB75511a03D747e128dEEFB97832D4604350Bf18e",
   "requiredPrefix": "zkmemory-",
   "orgs": {}
 }
