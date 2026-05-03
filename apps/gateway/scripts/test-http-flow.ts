@@ -81,7 +81,9 @@ HwIDAQAB
 
 const MAX_PARTIAL_DATA_LENGTH = 1024;
 const MAX_EMAIL_LENGTH = 100;
+const MAX_AUD_LENGTH = 128;
 const EMAIL = "alice@test.com";
+const AUD = "test-aud";
 const IAT = 1737642217;
 
 // A throwaway hardhat-style key. Public Sepolia/etc safe - never used elsewhere.
@@ -99,12 +101,31 @@ function check(label: string, ok: boolean, detail = ""): void {
   }
 }
 
+function base64UrlToHex(s: string): string {
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = (4 - (b64.length % 4)) % 4;
+  return Buffer.from(b64 + "=".repeat(pad), "base64").toString("hex");
+}
+
 async function main(): Promise<void> {
   console.log("[setup] generate one real proof shared across cases");
   const privateKey = crypto.createPrivateKey({ key: PRIVATE_KEY_PEM, type: "pkcs8", format: "pem" });
   const publicKey = crypto.createPublicKey({ key: PUBLIC_KEY_PEM, type: "spki", format: "pem" });
+
+  // Allow the test pubkey through the gateway's JWKS pin.
+  const testJwk = publicKey.export({ format: "jwk" }) as JsonWebKey;
+  process.env.ZKMA_SKIP_JWKS = "1";
+  process.env.ZKMA_EXTRA_MODULI = base64UrlToHex(testJwk.n!);
   const jwt = jsonwebtoken.sign(
-    { iss: "https://accounts.google.com", sub: "test", email: EMAIL, iat: IAT, exp: 1799999999 },
+    {
+      iss: "https://accounts.google.com",
+      sub: "test",
+      email_verified: true,
+      email: EMAIL,
+      iat: IAT,
+      aud: AUD,
+      exp: 1799999999,
+    },
     privateKey,
     { algorithm: "RS256" },
   );
@@ -114,6 +135,9 @@ async function main(): Promise<void> {
   const emailBytes = new TextEncoder().encode(EMAIL);
   const emailStorage = new Array<number>(MAX_EMAIL_LENGTH).fill(0);
   for (let i = 0; i < emailBytes.length; i++) emailStorage[i] = emailBytes[i]!;
+  const audBytes = new TextEncoder().encode(AUD);
+  const audStorage = new Array<number>(MAX_AUD_LENGTH).fill(0);
+  for (let i = 0; i < audBytes.length; i++) audStorage[i] = audBytes[i]!;
 
   const circuit = JSON.parse(readFileSync(CIRCUIT_PATH, "utf8"));
   const noir = new Noir(circuit);
@@ -124,6 +148,7 @@ async function main(): Promise<void> {
     pubkey_modulus_limbs: jwtInputs.pubkey_modulus_limbs,
     redc_params_limbs: jwtInputs.redc_params_limbs,
     expected_email: { storage: emailStorage, len: emailBytes.length },
+    expected_aud: { storage: audStorage, len: audBytes.length },
     iat_lower: IAT.toString(),
     iat_upper: IAT.toString(),
   } as never);

@@ -23,6 +23,7 @@ import { Noir } from "@noir-lang/noir_js";
 import { UltraHonkBackend } from "@aztec/bb.js";
 import { keccak256 } from "viem";
 import { verifyProof } from "../src/proof.js";
+import { _resetCache as resetJwksCache } from "../src/jwks.js";
 
 // noir-jwt's published ESM dist omits .js extensions on internal imports, so
 // strict ESM resolution fails. Load via CJS where Node's resolver still does
@@ -89,8 +90,16 @@ HwIDAQAB
 // Constants must match circuits/zkma-auth/src/main.nr.
 const MAX_PARTIAL_DATA_LENGTH = 1024;
 const MAX_EMAIL_LENGTH = 100;
+const MAX_AUD_LENGTH = 128;
 const EMAIL = "alice@test.com";
+const AUD = "test-aud";
 const IAT = 1737642217;
+
+function base64UrlToHex(s: string): string {
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = (4 - (b64.length % 4)) % 4;
+  return Buffer.from(b64 + "=".repeat(pad), "base64").toString("hex");
+}
 
 async function main(): Promise<void> {
   console.log("[1/5] sign JWT with the noir-jwt test fixture key");
@@ -101,6 +110,14 @@ async function main(): Promise<void> {
     key: PUBLIC_KEY_PEM, type: "spki", format: "pem",
   });
 
+  // Pin the gateway's JWKS allowlist to the test pubkey only. The default
+  // (real Google JWKS) would correctly reject our test-signed proof - we
+  // exercise that case at the bottom.
+  const testJwk = publicKey.export({ format: "jwk" }) as JsonWebKey;
+  process.env.ZKMA_SKIP_JWKS = "1";
+  process.env.ZKMA_EXTRA_MODULI = base64UrlToHex(testJwk.n!);
+  resetJwksCache();
+
   const jwt = jsonwebtoken.sign(
     {
       iss: "https://accounts.google.com",
@@ -108,7 +125,7 @@ async function main(): Promise<void> {
       email_verified: true,
       email: EMAIL,
       iat: IAT,
-      aud: "test-aud",
+      aud: AUD,
       exp: 1799999999,
     },
     privateKey,
@@ -123,10 +140,13 @@ async function main(): Promise<void> {
     maxSignedDataLength: MAX_PARTIAL_DATA_LENGTH,
   });
 
-  // Pad expected_email to MAX_EMAIL_LENGTH.
+  // Pad expected_email and expected_aud to their MAX lengths.
   const emailBytes = new TextEncoder().encode(EMAIL);
   const emailStorage = new Array<number>(MAX_EMAIL_LENGTH).fill(0);
   for (let i = 0; i < emailBytes.length; i++) emailStorage[i] = emailBytes[i]!;
+  const audBytes = new TextEncoder().encode(AUD);
+  const audStorage = new Array<number>(MAX_AUD_LENGTH).fill(0);
+  for (let i = 0; i < audBytes.length; i++) audStorage[i] = audBytes[i]!;
 
   const inputs = {
     data: jwtInputs.data!,
@@ -135,6 +155,7 @@ async function main(): Promise<void> {
     pubkey_modulus_limbs: jwtInputs.pubkey_modulus_limbs!,
     redc_params_limbs: jwtInputs.redc_params_limbs!,
     expected_email: { storage: emailStorage, len: emailBytes.length },
+    expected_aud: { storage: audStorage, len: audBytes.length },
     iat_lower: IAT.toString(),
     iat_upper: IAT.toString(),
   };
@@ -221,6 +242,22 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   console.log(`      wrong-commitment rejection: ${wrongResult.reason}`);
+
+  // Negative case 3: JWKS pin rejects a proof whose modulus is not allowlisted.
+  // We swap to an empty allowlist (skip JWKS, no extra moduli) and re-verify.
+  process.env.ZKMA_SKIP_JWKS = "1";
+  process.env.ZKMA_EXTRA_MODULI = "";
+  resetJwksCache();
+  const noJwksResult = await verifyProof({
+    proof: proofHex,
+    publicInputs: publicInputsHex,
+    expectedCommitment,
+  });
+  if (noJwksResult.ok) {
+    console.error("FAIL: gateway accepted a proof not in the JWKS allowlist");
+    process.exit(1);
+  }
+  console.log(`      jwks-pin rejection: ${noJwksResult.reason}`);
 
   console.log("\nPASS - gateway verifies real proofs and rejects bad ones.");
 }
