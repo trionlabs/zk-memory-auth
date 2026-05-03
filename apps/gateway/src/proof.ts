@@ -2,6 +2,11 @@ import { keccak256, toBytes } from "viem";
 import { readFileSync } from "node:fs";
 import { UltraHonkBackend } from "@aztec/bb.js";
 import { env } from "./env.js";
+import {
+  getAllowedModuliLimbs,
+  modulusFromPublicInputs,
+  moduliMatch,
+} from "./jwks.js";
 
 /**
  * Lazy-init the bb.js backend on first verify. CRS download + backend init takes
@@ -77,6 +82,20 @@ export async function verifyProof(args: {
     publicInputFields = hexToFieldStrings(args.publicInputs);
   } catch (e) {
     return { ok: false, reason: (e as Error).message };
+  }
+
+  // JWKS pin: the proof's pubkey_modulus_limbs (publicInputs[0..18]) must
+  // match a modulus Google currently publishes (or one allowlisted via
+  // ZKMA_EXTRA_MODULI for tests). Without this check, anyone could prove a
+  // JWT signed with their own RSA key.
+  try {
+    const proofModulus = modulusFromPublicInputs(publicInputFields);
+    const allowed = await getAllowedModuliLimbs();
+    if (!allowed.some((m) => moduliMatch(m, proofModulus))) {
+      return { ok: false, reason: "modulus not in JWKS allowlist" };
+    }
+  } catch (e) {
+    return { ok: false, reason: `jwks check failed: ${(e as Error).message}` };
   }
 
   const backend = await getBackend();
