@@ -39,7 +39,7 @@ PORT=8787 \
 | `MEM0_BASE_URL` | URL of the mem0 server (default `http://localhost:8888`) |
 | `MEM0_AGENT_ID` | mem0 `agent_id` scope for every zkma write/search (default `zkma`) |
 | `SEPOLIA_RPC_URL` | RPC for ENS resolution (default the public-node URL) |
-| `ZKMA_EXPECTED_AUD` | the platform's Google OAuth client_id; gateway pins `expected_aud` from publicInputs to this value |
+| `ZKMA_EXPECTED_AUD` | the platform's Google OAuth client_id; gateway pins `expected_aud` from publicInputs to this value. **Must match `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in admin-ui** - the id-token returned by Google Identity Services has `aud = client_id`, and the gateway will reject any other value. |
 
 ### Optional / security-relevant
 

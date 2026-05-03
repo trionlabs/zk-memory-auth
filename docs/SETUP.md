@@ -103,6 +103,18 @@ pnpm dev
 # http://localhost:3030
 ```
 
+For the `/refresh` page to show "Sign in with Google" instead of paste-JWT:
+
+```bash
+# 1. Register a Web OAuth client at https://console.cloud.google.com/apis/credentials
+#    Authorized JavaScript origins: http://localhost:3030 (+ prod origin if any)
+# 2. cp apps/admin-ui/.env.example apps/admin-ui/.env.local
+# 3. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
+# 4. Restart `pnpm dev`
+```
+
+The gateway must also start with `ZKMA_EXPECTED_AUD` set to the same client_id - the id-token's `aud` claim equals the client_id and the gateway pins it.
+
 ## Tests
 
 All tests live under `apps/gateway/scripts/` and are wired up as pnpm scripts. They each prove a different layer:

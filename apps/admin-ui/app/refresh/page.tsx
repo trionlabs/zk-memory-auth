@@ -12,19 +12,58 @@ import type { WorkerInput, WorkerProgress } from "./proof-worker";
  * exchanges a Google id-token for a fresh Noir proof and writes the
  * commitment to their `zkma:proof-commitment` ENS record.
  *
- * v0.1: paste-JWT (Google sign-in not yet wired). The flow is:
- *   1. Connect the wallet that owns your subname.
- *   2. Paste a Google ID token (from any sign-in flow you trust).
+ * Two ways to get a JWT, both supported on the page:
+ *   A. Sign In With Google button (Google Identity Services / GIS).
+ *      Requires NEXT_PUBLIC_GOOGLE_CLIENT_ID. The browser receives a
+ *      Google-signed id-token directly - no server-side OAuth dance,
+ *      no client_secret. The id-token's `aud` claim equals your client_id,
+ *      so the gateway must be started with ZKMA_EXPECTED_AUD set to the
+ *      same value.
+ *   B. Paste a JWT into the textarea. Useful for development before you
+ *      register a Google OAuth client (grab one from
+ *      https://developers.google.com/oauthplayground - "Google OAuth2
+ *      API v2" -> email scope -> Authorize APIs -> Exchange).
+ *
+ * Subsequent steps are identical for either path:
  *   3. Fetch Google's JWKS for the kid the token was signed with.
  *   4. Generate the Noir proof in a Web Worker (~10-30 seconds).
- *   5. The page computes the keccak commitment and offers a tx button
- *      that calls ZkmaResolver.setProofCommitment.
+ *   5. Compute the keccak commitment and offer a TxButton that calls
+ *      ZkmaResolver.setProofCommitment under the connected wallet.
  *
- * The wallet-only check `setProofCommitment` is what the contract enforces -
- * the page does not need an admin connection.
+ * The contract's onlyUser check on setProofCommitment binds writes to the
+ * subname's wallet, so the page never needs an admin connection.
  */
 
 const GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+            auto_select?: boolean;
+            cancel_on_tap_outside?: boolean;
+            ux_mode?: "popup" | "redirect";
+          }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: {
+              theme?: "outline" | "filled_blue" | "filled_black";
+              size?: "small" | "medium" | "large";
+              text?: "signin_with" | "signup_with" | "continue_with" | "signin";
+              shape?: "rectangular" | "pill" | "circle" | "square";
+              width?: number;
+            },
+          ) => void;
+        };
+      };
+    };
+  }
+}
 
 function parseJwt(jwt: string): { header: any; payload: any } | null {
   const parts = jwt.split(".");
@@ -61,10 +100,68 @@ export default function RefreshPage() {
   const [jwt, setJwt] = useState("");
   const [subname, setSubname] = useState("");
   const [state, setState] = useState<ProofState>({ kind: "idle" });
+  const [showPaste, setShowPaste] = useState(!GOOGLE_CLIENT_ID);
+  const [gisError, setGisError] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const gisButtonRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     return () => workerRef.current?.terminate();
+  }, []);
+
+  // Load Google Identity Services and render the official Sign In button
+  // if a client_id is configured. The id-token returned by GIS goes through
+  // the exact same pipeline as a pasted JWT.
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+    let cancelled = false;
+    let scriptEl: HTMLScriptElement | null = null;
+
+    function init() {
+      if (cancelled || !window.google || !gisButtonRef.current) return;
+      try {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (response) => {
+            if (response?.credential) {
+              setJwt(response.credential);
+              setShowPaste(false);
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          ux_mode: "popup",
+        });
+        // Clear any prior render so re-renders don't stack buttons.
+        gisButtonRef.current.innerHTML = "";
+        window.google.accounts.id.renderButton(gisButtonRef.current, {
+          theme: "filled_black",
+          size: "large",
+          text: "signin_with",
+          shape: "rectangular",
+        });
+      } catch (e) {
+        setGisError((e as Error).message);
+      }
+    }
+
+    if (window.google?.accounts?.id) {
+      init();
+    } else {
+      scriptEl = document.createElement("script");
+      scriptEl.src = "https://accounts.google.com/gsi/client";
+      scriptEl.async = true;
+      scriptEl.defer = true;
+      scriptEl.onload = init;
+      scriptEl.onerror = () =>
+        setGisError("failed to load Google Identity Services script");
+      document.head.appendChild(scriptEl);
+    }
+
+    return () => {
+      cancelled = true;
+      if (scriptEl && scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
+    };
   }, []);
 
   const parsed = parseJwt(jwt);
@@ -182,14 +279,49 @@ export default function RefreshPage() {
             className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1 font-mono"
           />
 
-          <label className="text-zinc-500 font-mono">JWT</label>
-          <textarea
-            value={jwt}
-            onChange={(e) => setJwt(e.target.value)}
-            placeholder="paste a Google id-token (eyJhbGciOi...)"
-            rows={6}
-            className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1 font-mono text-[11px]"
-          />
+          <label className="text-zinc-500 font-mono">sign in</label>
+          <div className="space-y-2">
+            {GOOGLE_CLIENT_ID ? (
+              <>
+                <div ref={gisButtonRef} />
+                {gisError && (
+                  <p className="text-[10px] text-red-400 font-mono">
+                    {gisError}
+                  </p>
+                )}
+                {jwt && (
+                  <p className="text-[10px] text-emerald-400 font-mono">
+                    ✓ id-token received from Google ({jwt.length} chars)
+                  </p>
+                )}
+                <button
+                  onClick={() => setShowPaste((v) => !v)}
+                  className="text-[10px] text-zinc-500 underline hover:text-zinc-300"
+                >
+                  {showPaste ? "hide" : "show"} advanced: paste JWT manually
+                </button>
+              </>
+            ) : (
+              <p className="text-[11px] text-amber-300 font-mono">
+                Set <code className="text-amber-200">NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> in
+                <code className="text-amber-200">apps/admin-ui/.env.local</code> for one-click sign-in.
+                Until then, paste a JWT below.
+              </p>
+            )}
+          </div>
+
+          {showPaste && (
+            <>
+              <label className="text-zinc-500 font-mono">JWT</label>
+              <textarea
+                value={jwt}
+                onChange={(e) => setJwt(e.target.value)}
+                placeholder="paste a Google id-token (eyJhbGciOi...) - get one from https://developers.google.com/oauthplayground"
+                rows={4}
+                className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1 font-mono text-[11px]"
+              />
+            </>
+          )}
 
           {parsed && (
             <>
