@@ -24,6 +24,15 @@ contract ZkmaResolverTest is Test {
         external pure returns (bytes4) { return this.onERC1155BatchReceived.selector; }
     function supportsInterface(bytes4) external pure returns (bool) { return true; }
 
+    // Redeclared so vm.expectEmit can match - signatures must mirror ZkmaResolver.
+    event OrgRegistered(bytes32 indexed orgNode, address indexed admin, string label);
+    event UserRegistered(bytes32 indexed orgNode, string userLabel, address userAddr);
+    event UserUpdated(bytes32 indexed orgNode, string userLabel);
+    event UserRevoked(bytes32 indexed orgNode, string userLabel);
+    event ProofCommitmentSet(bytes32 indexed orgNode, string userLabel, bytes32 commitment);
+    event EmailHashSet(bytes32 indexed orgNode, string userLabel, bytes32 emailHash);
+    event PartnersSet(bytes32 indexed orgNode, string partnersCsv);
+
     bytes32 constant ROOT_NODE = bytes32(0);
     bytes32 constant ETH_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae;
 
@@ -100,6 +109,10 @@ contract ZkmaResolverTest is Test {
         vm.prank(adminA);
         nameWrapper.setApprovalForAll(address(resolver), true);
 
+        // OrgRegistered event: indexed orgNode, indexed admin, label.
+        vm.expectEmit(true, true, false, true, address(resolver));
+        emit OrgRegistered(hospitalNode, adminA, hospitalLabel);
+
         vm.prank(adminA);
         bytes32 node = resolver.registerOrg(hospitalLabel);
         assertEq(node, hospitalNode);
@@ -164,6 +177,12 @@ contract ZkmaResolverTest is Test {
     function test_registerUser_mintsWrappedSubname() public {
         _registerHospital();
 
+        // Both UserRegistered and EmailHashSet are emitted by registerUser.
+        vm.expectEmit(true, false, false, true, address(resolver));
+        emit UserRegistered(hospitalNode, "aysel", aysel);
+        vm.expectEmit(true, false, false, true, address(resolver));
+        emit EmailHashSet(hospitalNode, "aysel", AYSEL_EMAIL_HASH);
+
         vm.prank(adminA);
         bytes32 userNode = resolver.registerUser(
             hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH,
@@ -181,6 +200,117 @@ contract ZkmaResolverTest is Test {
 
         // addr returns the user's wallet (signature verification path).
         assertEq(resolver.addr(userNode), payable(aysel));
+    }
+
+    function test_updateUser_changesRoleAndEmits() public {
+        _registerHospital();
+        vm.prank(adminA);
+        resolver.registerUser(
+            hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH,
+            "nurse", "clinical", "confidential", uint64(block.timestamp + 7 days)
+        );
+
+        vm.expectEmit(true, false, false, true, address(resolver));
+        emit UserUpdated(hospitalNode, "aysel");
+
+        vm.prank(adminA);
+        resolver.updateUser(
+            hospitalNode, "aysel",
+            "attending", "clinical,operational,research", "restricted",
+            uint64(block.timestamp + 30 days)
+        );
+
+        bytes32 userNode = keccak256(abi.encodePacked(hospitalNode, keccak256("aysel")));
+        assertEq(resolver.text(userNode, "zkma:role"), "attending");
+        assertEq(resolver.text(userNode, "zkma:namespaces"), "clinical,operational,research");
+        assertEq(resolver.text(userNode, "zkma:max-tag"), "restricted");
+        // emailHash stays put across updateUser - that's the trust kernel.
+        assertEq(resolver.text(userNode, "zkma:email-hash"), _hex(AYSEL_EMAIL_HASH));
+    }
+
+    function test_updateUser_revertsIfNotAdmin() public {
+        _registerHospital();
+        vm.prank(adminA);
+        resolver.registerUser(
+            hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH,
+            "nurse", "clinical", "confidential", uint64(block.timestamp + 7 days)
+        );
+
+        vm.prank(bob);
+        vm.expectRevert(ZkmaResolver.NotOrgAdmin.selector);
+        resolver.updateUser(
+            hospitalNode, "aysel",
+            "attending", "clinical", "restricted",
+            uint64(block.timestamp + 30 days)
+        );
+    }
+
+    function test_updateUser_revertsIfMissing() public {
+        _registerHospital();
+        vm.prank(adminA);
+        vm.expectRevert(ZkmaResolver.UserMissing.selector);
+        resolver.updateUser(
+            hospitalNode, "ghost",
+            "nurse", "clinical", "confidential",
+            uint64(block.timestamp + 1 days)
+        );
+    }
+
+    function test_revokeUser_setsRevokedTrueAndEmits() public {
+        _registerHospital();
+        vm.prank(adminA);
+        resolver.registerUser(
+            hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH,
+            "nurse", "clinical", "confidential", uint64(block.timestamp + 7 days)
+        );
+        bytes32 userNode = keccak256(abi.encodePacked(hospitalNode, keccak256("aysel")));
+        assertEq(resolver.text(userNode, "zkma:revoked"), "false");
+
+        vm.expectEmit(true, false, false, true, address(resolver));
+        emit UserRevoked(hospitalNode, "aysel");
+
+        vm.prank(adminA);
+        resolver.revokeUser(hospitalNode, "aysel");
+        assertEq(resolver.text(userNode, "zkma:revoked"), "true");
+    }
+
+    function test_revokeUser_revertsIfNotAdmin() public {
+        _registerHospital();
+        vm.prank(adminA);
+        resolver.registerUser(
+            hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH,
+            "nurse", "clinical", "confidential", uint64(block.timestamp + 7 days)
+        );
+
+        vm.prank(bob);
+        vm.expectRevert(ZkmaResolver.NotOrgAdmin.selector);
+        resolver.revokeUser(hospitalNode, "aysel");
+    }
+
+    function test_setPartners_emitsAndStores() public {
+        _registerHospital();
+        vm.expectEmit(true, false, false, true, address(resolver));
+        emit PartnersSet(hospitalNode, "zkmemory-acmeinsurance.eth");
+
+        vm.prank(adminA);
+        resolver.setPartners(hospitalNode, "zkmemory-acmeinsurance.eth");
+        assertEq(resolver.orgPartners(hospitalNode), "zkmemory-acmeinsurance.eth");
+    }
+
+    function test_setProofCommitment_emitsAndStores() public {
+        _registerHospital();
+        vm.prank(adminA);
+        resolver.registerUser(
+            hospitalNode, "aysel", aysel, AYSEL_EMAIL_HASH,
+            "nurse", "clinical", "confidential", uint64(block.timestamp + 7 days)
+        );
+        bytes32 commitment = bytes32(uint256(0xc0ffee));
+
+        vm.expectEmit(true, false, false, true, address(resolver));
+        emit ProofCommitmentSet(hospitalNode, "aysel", commitment);
+
+        vm.prank(aysel);
+        resolver.setProofCommitment(hospitalNode, "aysel", commitment);
     }
 
     function test_setEmailHash_adminCanRotate() public {
