@@ -76,8 +76,6 @@ export async function verifyProof(args: {
     return { ok: false, reason: "proof commitment mismatch" };
   }
 
-  if (env.skipProofVerify) return { ok: true };
-
   let publicInputFields: string[];
   try {
     publicInputFields = hexToFieldStrings(args.publicInputs);
@@ -88,7 +86,9 @@ export async function verifyProof(args: {
   // JWKS pin: the proof's pubkey_modulus_limbs (publicInputs[0..18]) must
   // match a modulus Google currently publishes (or one allowlisted via
   // ZKMA_EXTRA_MODULI for tests). Without this check, anyone could prove a
-  // JWT signed with their own RSA key.
+  // JWT signed with their own RSA key. Runs ALWAYS, including in skip mode,
+  // because skipping bb.js is cheap-iteration; skipping JWKS would let
+  // anyone past the gate.
   try {
     const proofModulus = modulusFromPublicInputs(publicInputFields);
     const allowed = await getAllowedModuliLimbs();
@@ -100,8 +100,19 @@ export async function verifyProof(args: {
   }
 
   // Claim pinning: stop the user from picking arbitrary aud/iss/iat values.
-  const claims = checkClaims(publicInputFields);
+  // Same rationale as JWKS: never skipped.
+  let claims;
+  try {
+    claims = checkClaims(publicInputFields);
+  } catch (e) {
+    return { ok: false, reason: `claims check failed: ${(e as Error).message}` };
+  }
   if (!claims.ok) return { ok: false, reason: claims.reason };
+
+  // Skip the bb.js cryptographic call only when explicitly requested. The
+  // start-up warning in index.ts logs this state. JWKS + claim pins above
+  // still ran, so skip mode is no longer a full bypass.
+  if (env.skipProofVerify) return { ok: true };
 
   const backend = await getBackend();
   const valid = await backend.verifyProof({

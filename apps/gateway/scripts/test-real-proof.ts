@@ -23,7 +23,7 @@ import { Noir } from "@noir-lang/noir_js";
 import { UltraHonkBackend } from "@aztec/bb.js";
 import { keccak256 } from "viem";
 import { verifyProof } from "../src/proof.js";
-import { _resetCache as resetJwksCache } from "../src/jwks.js";
+import { __zkmaTestResetJwksCache as resetJwksCache } from "../src/jwks.js";
 
 // noir-jwt's published ESM dist omits .js extensions on internal imports, so
 // strict ESM resolution fails. Load via CJS where Node's resolver still does

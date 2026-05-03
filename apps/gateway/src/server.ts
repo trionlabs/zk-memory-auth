@@ -2,7 +2,6 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { randomBytes } from "node:crypto";
 import { keccak256, recoverMessageAddress } from "viem";
 import {
-  evaluate,
   isTag,
   type MemoryMeta,
   type Principal,
@@ -39,6 +38,17 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
   type Nonce = { value: string; expiresAt: number };
   const nonceStore = new Map<string, Nonce>();
   const NONCE_TTL_MS = 60_000;
+  const SWEEP_INTERVAL_MS = 30_000;
+
+  // In-process Map: single-instance only. Multi-instance gateway needs a
+  // shared store (Redis). The sweeper below caps memory in the meantime.
+  const sweeper = setInterval(() => {
+    const cutoff = Date.now();
+    for (const [key, entry] of nonceStore) {
+      if (entry.expiresAt <= cutoff) nonceStore.delete(key);
+    }
+  }, SWEEP_INTERVAL_MS);
+  sweeper.unref();
 
   function issueNonce(subname: string): string {
     const value = "0x" + randomBytes(32).toString("hex");
@@ -147,8 +157,15 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
       });
       if (!auth.ok) return reply.code(auth.status).send({ error: auth.error });
 
-      const hits = await search(auth.resolved.principal, body.query);
-      return { results: hits };
+      try {
+        const hits = await search(auth.resolved.principal, body.query);
+        return { results: hits };
+      } catch (e) {
+        // Sanitize: log full error server-side, return a generic 502 so we
+        // never leak upstream tokens, traces, or internal addresses.
+        fastify.log.error({ err: e }, "mem0 search failed");
+        return reply.code(502).send({ error: "upstream search failed" });
+      }
     },
   );
 
@@ -194,15 +211,17 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
         return reply.code(403).send({ error: writeCheck.reason });
       }
 
-      const upstream = await write(writeCheck.meta, body.content, body.subname);
-      return upstream;
+      try {
+        const upstream = await write(writeCheck.meta, body.content, body.subname);
+        return upstream;
+      } catch (e) {
+        fastify.log.error({ err: e }, "mem0 write failed");
+        return reply.code(502).send({ error: "upstream write failed" });
+      }
     },
   );
 
   fastify.get("/healthz", async () => ({ ok: true }));
-
-  // Re-export evaluate so callers that wire fakes can mirror server-side behavior.
-  void evaluate;
 
   return fastify;
 }

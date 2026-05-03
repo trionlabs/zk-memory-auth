@@ -30,8 +30,11 @@ const IAT_UPPER_OFFSET = IAT_LOWER_OFFSET + 1;
 
 export const EXPECTED_PUBLIC_INPUT_COUNT = IAT_UPPER_OFFSET + 1;
 
-function fieldToNumber(hex: string): number {
-  return Number(BigInt(hex));
+function fieldToBigInt(hex: string | undefined): bigint {
+  if (typeof hex !== "string") {
+    throw new Error("missing public input field");
+  }
+  return BigInt(hex);
 }
 
 function decodeBoundedVec(
@@ -40,15 +43,18 @@ function decodeBoundedVec(
   storageLen: number,
   lengthIndex: number,
 ): string {
-  const len = fieldToNumber(publicInputs[lengthIndex]!);
-  if (len > storageLen) {
-    throw new Error(`bounded vec length ${len} exceeds capacity ${storageLen}`);
+  const lenBig = fieldToBigInt(publicInputs[lengthIndex]);
+  if (lenBig < 0n || lenBig > BigInt(storageLen)) {
+    throw new Error(`bounded vec length ${lenBig} exceeds capacity ${storageLen}`);
   }
+  const len = Number(lenBig);
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
-    const v = fieldToNumber(publicInputs[storageStart + i]!);
-    if (v < 0 || v > 255) throw new Error(`byte out of range at ${storageStart + i}`);
-    bytes[i] = v;
+    const vBig = fieldToBigInt(publicInputs[storageStart + i]);
+    if (vBig < 0n || vBig > 255n) {
+      throw new Error(`byte out of range at ${storageStart + i}`);
+    }
+    bytes[i] = Number(vBig);
   }
   return new TextDecoder().decode(bytes);
 }
@@ -110,17 +116,18 @@ export function checkClaims(publicInputs: string[]): ClaimsCheckResult {
     return { ok: false, reason: `iss mismatch: ${iss}` };
   }
 
-  const iatLower = fieldToNumber(publicInputs[IAT_LOWER_OFFSET]!);
-  const iatUpper = fieldToNumber(publicInputs[IAT_UPPER_OFFSET]!);
-  const now = Math.floor(Date.now() / 1000);
+  const iatLower = fieldToBigInt(publicInputs[IAT_LOWER_OFFSET]);
+  const iatUpper = fieldToBigInt(publicInputs[IAT_UPPER_OFFSET]);
+  const now = BigInt(Math.floor(Date.now() / 1000));
   if (iatLower > iatUpper) {
     return { ok: false, reason: "iat_lower > iat_upper" };
   }
-  if (iatLower < now - env.iatMaxAgeSecs) {
+  const earliest = now - BigInt(env.iatMaxAgeSecs);
+  if (iatLower < earliest) {
     return { ok: false, reason: `iat_lower ${iatLower} too old` };
   }
   // Allow a small future skew (60s) for clock drift between client and gateway.
-  if (iatUpper > now + 60) {
+  if (iatUpper > now + 60n) {
     return { ok: false, reason: `iat_upper ${iatUpper} in the future` };
   }
   return { ok: true };

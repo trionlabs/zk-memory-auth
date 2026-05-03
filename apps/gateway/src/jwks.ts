@@ -118,8 +118,15 @@ export function moduliMatch(a: bigint[], b: bigint[]): boolean {
   return true;
 }
 
-/** Test-only - reset the in-memory cache (used by negative tests). */
-export function _resetCache(): void {
+/**
+ * Test-only - reset the in-memory cache between cases.
+ *
+ * The double-underscore + zkma prefix is an explicit "do not call" signal:
+ * grep for this name should turn up exactly the test scripts and nothing else.
+ * The cache invalidates automatically when env changes anyway, so this is
+ * only needed when a test does NOT change env (and wants to force a refetch).
+ */
+export function __zkmaTestResetJwksCache(): void {
   cache = null;
   cachedSnapshot = "";
 }
