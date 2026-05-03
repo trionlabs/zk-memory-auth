@@ -10,6 +10,7 @@ node_modules/
 **/build/
 **/.turbo/
 **/.vercel/
+**/.svelte-kit/
 
 # foundry
 contracts/cache/

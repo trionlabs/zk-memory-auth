@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter @zkma/admin-ui dev",
+    "dev:landing": "pnpm --filter @zkma/landing dev",
     "build": "pnpm --filter @zkma/admin-ui build",
+    "build:landing": "pnpm --filter @zkma/landing build",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
     "seed:memories": "pnpm --filter @zkma/gateway exec tsx ../../scripts/seed-memories.ts"

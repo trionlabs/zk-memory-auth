@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-mode="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>zk memory auth</title>
+    <meta
+      name="description"
+      content="ZK-gated authorization for AI agent memory. Roles and policies stored on ENS, not in a database."
+    />
+    <meta property="og:title" content="zk memory auth" />
+    <meta
+      property="og:description"
+      content="A drop-in gateway in front of mem0 that checks ZK identity proofs against ENS-anchored policy."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // Boot persisted theme before paint to avoid flash. Inline so it runs
+      // before SvelteKit hydrates anything; failure modes are silent.
+      (function () {
+        try {
+          var raw = localStorage.getItem("zkma.theme");
+          if (!raw) return;
+          var t = JSON.parse(raw);
+          if (t && (t.theme === "light" || t.theme === "dark")) {
+            document.documentElement.setAttribute("data-theme", t.theme);
+            document.documentElement.setAttribute("data-mode", t.theme);
+          }
+        } catch (_) {}
+      })();
+    </script>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
