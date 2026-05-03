@@ -6,7 +6,7 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./abi": "./src/abi/ZkcaResolver.json",
+    "./abi": "./src/abi/ZkmaResolver.json",
     "./deployments/sepolia": "./src/deployments/sepolia.json"
   },
   "scripts": {

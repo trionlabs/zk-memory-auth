@@ -1,7 +1,7 @@
-// Self-contained Sepolia smoke for zkcontextauth v2.
+// Self-contained Sepolia smoke for zkmemoryauthorization v2.
 // Discovers all registered orgs via OrgRegistered events, then for each org
 // discovers users via UserRegistered events, then verifies every user's records
-// resolve via standard ENS lookup (i.e., end-to-end through walk-up + ZkcaResolver).
+// resolve via standard ENS lookup (i.e., end-to-end through walk-up + ZkmaResolver).
 //
 // Usage (from contracts/):
 //   npm install --no-save viem@2
@@ -12,7 +12,7 @@ import { sepolia } from "viem/chains";
 import deployment from "../../packages/contracts-types/src/deployments/sepolia.json" with { type: "json" };
 
 const RPC = "https://ethereum-sepolia-rpc.publicnode.com";
-const RESOLVER = deployment.zkcaResolver;
+const RESOLVER = deployment.zkmaResolver;
 const FROM_BLOCK = BigInt(deployment.deployBlock);
 
 const c = createPublicClient({ chain: sepolia, transport: http(RPC) });
@@ -50,8 +50,8 @@ for (const orgLog of orgLogs) {
   const ensName = `${label}.eth`;
   console.log(`== ${ensName} (org) ==`);
   expect("addr (admin)", await c.getEnsAddress({ name: ensName }), (v) => v?.toLowerCase() === admin.toLowerCase());
-  expect("zkca:platform", await c.getEnsText({ name: ensName, key: "zkca:platform" }), (v) => v === "zkcontextauth");
-  expect("zkca:org",      await c.getEnsText({ name: ensName, key: "zkca:org" }),      (v) => v === label);
+  expect("zkma:platform", await c.getEnsText({ name: ensName, key: "zkma:platform" }), (v) => v === "zkmemoryauthorization");
+  expect("zkma:org",      await c.getEnsText({ name: ensName, key: "zkma:org" }),      (v) => v === label);
 
   const userLogs = await c.getLogs({
     address: RESOLVER,
@@ -75,10 +75,10 @@ for (const orgLog of orgLogs) {
     const userEns = `${userLabel}.${ensName}`;
     console.log(`  → ${userEns}`);
     expect("    addr (user wallet)", await c.getEnsAddress({ name: userEns }), (v) => v?.toLowerCase() === userAddr.toLowerCase());
-    expect("    zkca:role         ", await c.getEnsText({ name: userEns, key: "zkca:role" }),       (v) => !!v);
-    expect("    zkca:namespaces   ", await c.getEnsText({ name: userEns, key: "zkca:namespaces" }), (v) => !!v);
-    expect("    zkca:max-tag      ", await c.getEnsText({ name: userEns, key: "zkca:max-tag" }),    (v) => !!v);
-    expect("    zkca:revoked      ", await c.getEnsText({ name: userEns, key: "zkca:revoked" }),    (v) => v === "true" || v === "false");
+    expect("    zkma:role         ", await c.getEnsText({ name: userEns, key: "zkma:role" }),       (v) => !!v);
+    expect("    zkma:namespaces   ", await c.getEnsText({ name: userEns, key: "zkma:namespaces" }), (v) => !!v);
+    expect("    zkma:max-tag      ", await c.getEnsText({ name: userEns, key: "zkma:max-tag" }),    (v) => !!v);
+    expect("    zkma:revoked      ", await c.getEnsText({ name: userEns, key: "zkma:revoked" }),    (v) => v === "true" || v === "false");
   }
   console.log("");
 }
