@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { sepoliaDeployment, ZkcaResolverAbi } from "@zkca/contracts-types";
+import { sepoliaDeployment, ZkmaResolverAbi } from "@zkca/contracts-types";
 import { keccak256, namehash, stringToBytes, type Abi } from "viem";
 
-const RESOLVER = sepoliaDeployment.zkcaResolver;
+const RESOLVER = sepoliaDeployment.zkmaResolver;
 const NAME_WRAPPER = sepoliaDeployment.nameWrapper;
 const BASE_REGISTRAR = "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85" as `0x${string}`;
 const PREFIX = sepoliaDeployment.requiredPrefix;
@@ -377,7 +377,7 @@ export function CreateOrgForm({ onCreated }: Props) {
             onClick={() =>
               registerTx.writeContract({
                 address: RESOLVER,
-                abi: ZkcaResolverAbi as Abi,
+                abi: ZkmaResolverAbi as Abi,
                 functionName: "registerOrg",
                 args: [fullLabel],
               })

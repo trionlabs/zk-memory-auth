@@ -1,7 +1,7 @@
 import { parseAbiItem, type PublicClient } from "viem";
 import { sepoliaDeployment } from "@zkca/contracts-types";
 
-const RESOLVER = sepoliaDeployment.zkcaResolver;
+const RESOLVER = sepoliaDeployment.zkmaResolver;
 const FROM_BLOCK = BigInt(sepoliaDeployment.deployBlock);
 
 const orgRegisteredEvent = parseAbiItem(

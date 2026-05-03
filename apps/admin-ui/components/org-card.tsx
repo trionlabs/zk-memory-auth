@@ -2,7 +2,7 @@
 
 import { useAccount, usePublicClient, useReadContract, useReadContracts } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
-import { sepoliaDeployment, ZkcaResolverAbi } from "@zkca/contracts-types";
+import { sepoliaDeployment, ZkmaResolverAbi } from "@zkca/contracts-types";
 import type { Abi } from "viem";
 import { labelHash, shortAddr } from "@/lib/utils";
 import { fetchOrgUserLabels, type OrgSummary } from "@/lib/users";
@@ -10,7 +10,7 @@ import { UserRow } from "./user-row";
 import { RegisterUserForm } from "./register-user-form";
 import { PartnersEditor } from "./partners-editor";
 
-const RESOLVER = sepoliaDeployment.zkcaResolver;
+const RESOLVER = sepoliaDeployment.zkmaResolver;
 
 type Props = {
   org: OrgSummary;
@@ -26,7 +26,7 @@ export function OrgCard({ org }: Props) {
 
   const partnersQuery = useReadContract({
     address: RESOLVER,
-    abi: ZkcaResolverAbi as Abi,
+    abi: ZkmaResolverAbi as Abi,
     functionName: "orgPartners",
     args: [orgNode],
   });
@@ -42,7 +42,7 @@ export function OrgCard({ org }: Props) {
   const userLookups = useReadContracts({
     contracts: allLabels.map((l) => ({
       address: RESOLVER,
-      abi: ZkcaResolverAbi as Abi,
+      abi: ZkmaResolverAbi as Abi,
       functionName: "users",
       args: [orgNode, labelHash(l)],
     })),

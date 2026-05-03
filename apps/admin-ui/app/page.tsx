@@ -3,22 +3,22 @@ import { OrgList } from "@/components/org-list";
 import { WalletButton } from "@/components/wallet-button";
 
 export default function Home() {
-  const { zkcaResolver, requiredPrefix } = sepoliaDeployment;
+  const { zkmaResolver, requiredPrefix } = sepoliaDeployment;
 
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-zinc-900 px-6 py-4 flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-semibold tracking-tight text-lg">zkcontextauth · admin</h1>
+          <h1 className="font-semibold tracking-tight text-lg">zkmemoryauthorization · admin</h1>
           <p className="text-[11px] text-zinc-500 font-mono">
             sepolia · resolver{" "}
             <a
-              href={`https://sepolia.etherscan.io/address/${zkcaResolver}`}
+              href={`https://sepolia.etherscan.io/address/${zkmaResolver}`}
               target="_blank"
               rel="noreferrer"
               className="hover:text-zinc-300 underline underline-offset-2"
             >
-              {zkcaResolver}
+              {zkmaResolver}
             </a>{" "}
             · prefix <code className="text-zinc-300">{requiredPrefix}</code>
           </p>

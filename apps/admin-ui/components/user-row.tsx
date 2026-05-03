@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useAccount, useReadContract } from "wagmi";
-import { sepoliaDeployment, ZkcaResolverAbi } from "@zkca/contracts-types";
+import { sepoliaDeployment, ZkmaResolverAbi } from "@zkca/contracts-types";
 import type { Abi } from "viem";
 import { fmtExpiry, labelHash, shortAddr } from "@/lib/utils";
 import { TxButton } from "./tx-button";
 
-const RESOLVER = sepoliaDeployment.zkcaResolver;
+const RESOLVER = sepoliaDeployment.zkmaResolver;
 
 type UserRowProps = {
   orgNode: `0x${string}`;
@@ -22,7 +22,7 @@ export function UserRow({ orgNode, orgAdmin, userLabel, ensName }: UserRowProps)
 
   const userQuery = useReadContract({
     address: RESOLVER,
-    abi: ZkcaResolverAbi as Abi,
+    abi: ZkmaResolverAbi as Abi,
     functionName: "users",
     args: [orgNode, labelHash(userLabel)],
   });

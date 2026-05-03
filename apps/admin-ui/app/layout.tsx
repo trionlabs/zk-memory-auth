@@ -7,9 +7,9 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "zkcontextauth · admin",
+  title: "zkmemoryauthorization · admin",
   description:
-    "Programmable, portable, verifiable authorization for AI agent memory — anchored on ENS.",
+    "Programmable, portable, verifiable authorization for AI agent memory - anchored on ENS.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

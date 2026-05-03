@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { sepoliaDeployment, ZkcaResolverAbi } from "@zkca/contracts-types";
+import { sepoliaDeployment, ZkmaResolverAbi } from "@zkca/contracts-types";
 import type { Abi } from "viem";
 
 type Args = unknown[];
@@ -19,7 +19,7 @@ type TxButtonProps = {
   children?: ReactNode;
 };
 
-const RESOLVER_ADDR = sepoliaDeployment.zkcaResolver;
+const RESOLVER_ADDR = sepoliaDeployment.zkmaResolver;
 
 export function TxButton({
   functionName,
@@ -43,7 +43,7 @@ export function TxButton({
   const send = () =>
     writeContract({
       address: RESOLVER_ADDR,
-      abi: ZkcaResolverAbi as Abi,
+      abi: ZkmaResolverAbi as Abi,
       functionName,
       args,
     });
