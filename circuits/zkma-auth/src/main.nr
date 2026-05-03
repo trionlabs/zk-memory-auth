@@ -26,6 +26,7 @@ use jwt::JWT;
 global MAX_PARTIAL_DATA_LENGTH: u32 = 1024;
 global MAX_EMAIL_LENGTH: u32 = 100;
 global MAX_AUD_LENGTH: u32 = 128;
+global MAX_ISS_LENGTH: u32 = 64;
 
 fn main(
     data: BoundedVec<u8, MAX_PARTIAL_DATA_LENGTH>,
@@ -35,6 +36,7 @@ fn main(
     redc_params_limbs: pub [u128; 18],
     expected_email: pub BoundedVec<u8, MAX_EMAIL_LENGTH>,
     expected_aud: pub BoundedVec<u8, MAX_AUD_LENGTH>,
+    expected_iss: pub BoundedVec<u8, MAX_ISS_LENGTH>,
     iat_lower: pub u64,
     iat_upper: pub u64,
 ) {
@@ -51,6 +53,7 @@ fn main(
     jwt.assert_claim_string("email".as_bytes(), expected_email);
     jwt.assert_claim_bool("email_verified".as_bytes(), true);
     jwt.assert_claim_string("aud".as_bytes(), expected_aud);
+    jwt.assert_claim_string("iss".as_bytes(), expected_iss);
 
     let iat: u64 = jwt.get_claim_number("iat".as_bytes());
     assert(iat >= iat_lower);
