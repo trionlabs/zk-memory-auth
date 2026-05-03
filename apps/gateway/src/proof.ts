@@ -1,6 +1,6 @@
 import { keccak256, toBytes } from "viem";
 import { readFileSync } from "node:fs";
-import { Barretenberg, UltraHonkBackend } from "@aztec/bb.js";
+import { UltraHonkBackend } from "@aztec/bb.js";
 import { env } from "./env.js";
 
 /**
@@ -21,8 +21,7 @@ async function getBackend(): Promise<UltraHonkBackend> {
         `circuit artifact at ${env.circuitArtifactPath} missing bytecode field`,
       );
     }
-    const api = await Barretenberg.new();
-    return new UltraHonkBackend(artifact.bytecode, api);
+    return new UltraHonkBackend(artifact.bytecode);
   })();
   return backendPromise;
 }

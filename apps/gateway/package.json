@@ -7,17 +7,22 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:proof": "tsx scripts/test-real-proof.ts"
   },
   "dependencies": {
-    "@aztec/bb.js": "^4.2.0",
+    "@aztec/bb.js": "3.0.0-nightly.20251104",
     "@zkma/contracts-types": "workspace:*",
     "@zkma/policy": "workspace:*",
     "fastify": "^5.0.0",
     "viem": "^2.21.0"
   },
   "devDependencies": {
+    "@noir-lang/noir_js": "1.0.0-beta.15",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
+    "jsonwebtoken": "^9.0.3",
+    "noir-jwt": "^0.4.5",
     "tsx": "^4.19.0",
     "typescript": "^5"
   }
