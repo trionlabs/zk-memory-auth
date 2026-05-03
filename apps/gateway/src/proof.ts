@@ -7,6 +7,7 @@ import {
   modulusFromPublicInputs,
   moduliMatch,
 } from "./jwks.js";
+import { checkClaims } from "./claims.js";
 
 /**
  * Lazy-init the bb.js backend on first verify. CRS download + backend init takes
@@ -97,6 +98,10 @@ export async function verifyProof(args: {
   } catch (e) {
     return { ok: false, reason: `jwks check failed: ${(e as Error).message}` };
   }
+
+  // Claim pinning: stop the user from picking arbitrary aud/iss/iat values.
+  const claims = checkClaims(publicInputFields);
+  if (!claims.ok) return { ok: false, reason: claims.reason };
 
   const backend = await getBackend();
   const valid = await backend.verifyProof({

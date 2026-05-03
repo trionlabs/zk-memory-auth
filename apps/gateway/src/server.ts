@@ -11,6 +11,7 @@ import {
 import { resolvePrincipal as realResolvePrincipal, type ResolvedPrincipal } from "./ens.js";
 import { searchAndFilter as realSearch, postMemory as realPost, checkWrite } from "./mem0.js";
 import { verifyProof as realVerifyProof } from "./proof.js";
+import { env } from "./env.js";
 
 /**
  * Injection points for tests. In prod, defaults to the real ENS resolver,
@@ -90,8 +91,12 @@ export function buildServer(deps: ServerDeps = {}): FastifyInstance {
     if (!proofCheck.ok) return { ok: false, status: 403, error: proofCheck.reason };
 
     const requestHash = keccak256(new TextEncoder().encode(JSON.stringify(body)));
+    // Domain separator: a sig for one deployment cannot be replayed against
+    // another that uses a different ZKMA_GATEWAY_DOMAIN value.
+    const domainHash = keccak256(new TextEncoder().encode(env.gatewayDomain));
     const challenge = keccak256(
       new Uint8Array([
+        ...Buffer.from(domainHash.replace(/^0x/, ""), "hex"),
         ...Buffer.from(consumedNonce.replace(/^0x/, ""), "hex"),
         ...Buffer.from(requestHash.replace(/^0x/, ""), "hex"),
       ]),
